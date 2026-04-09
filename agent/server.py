@@ -11,10 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-try:
-    from .main import analyze_six_pillars, build_tailored_explanation, explain_pillar
-except ImportError:  # pragma: no cover - fallback for direct script execution
-    from main import analyze_six_pillars, build_tailored_explanation, explain_pillar
+from .main import analyze_six_pillars, build_tailored_explanation, explain_pillar
 
 app = FastAPI(
     title="Longevity ADK Agent Server",

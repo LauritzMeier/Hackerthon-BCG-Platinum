@@ -3,6 +3,12 @@ from decimal import Decimal
 from typing import Dict, List, Optional
 
 from .compass import build_coach_snapshot, build_compass, build_weekly_plan
+from .journey_context import (
+    build_care_context,
+    build_data_coverage,
+    build_journey_start,
+    build_offer_summary,
+)
 
 
 def _to_float(value) -> float:
@@ -110,16 +116,24 @@ def build_experience(bundle: Dict) -> Dict:
     weekly_plan = build_weekly_plan(bundle)
     coach = build_coach_snapshot(bundle)
     recommended_offer = compass["summary"]["recommended_offer"]
-    offers = bundle.get("offers", [])
-    additional_offers = [
-        offer
-        for offer in offers
-        if recommended_offer is None
-        or offer.get("offer_code") != recommended_offer.get("offer_code")
-    ]
     flags = bundle.get("flags", [])
     age = _to_float(profile.get("age"))
     biological_age = profile.get("estimated_biological_age")
+    care_context = build_care_context(bundle, compass["primary_focus"])
+    data_coverage = build_data_coverage(bundle, compass["primary_focus"])
+    journey_start = build_journey_start(
+        bundle,
+        compass["primary_focus"],
+        care_context,
+        data_coverage,
+    )
+    offer_summary = build_offer_summary(
+        bundle,
+        compass["primary_focus"],
+        recommended_offer,
+        care_context,
+        data_coverage,
+    )
 
     return _normalize(
         {
@@ -140,6 +154,9 @@ def build_experience(bundle: Dict) -> Dict:
             "compass": compass,
             "weekly_plan": weekly_plan,
             "coach": coach,
+            "journey_start": journey_start,
+            "care_context": care_context,
+            "data_coverage": data_coverage,
             "progress_summary": build_progress_summary(bundle),
             "alerts": {
                 "total_count": len(flags),
@@ -148,9 +165,6 @@ def build_experience(bundle: Dict) -> Dict:
                 ),
                 "items": flags[:3],
             },
-            "offers": {
-                "recommended": recommended_offer,
-                "additional_items": additional_offers[:3],
-            },
+            "offers": offer_summary,
         }
     )

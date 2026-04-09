@@ -35,6 +35,9 @@ src/
     config.py
     pipeline.py
     repository.py
+agent/
+  main.py         # ADK-backed coaching tools and startup wiring
+  server.py       # FastAPI/SSE chat wrapper around the agent
 ```
 
 ## Recommended Architecture
@@ -150,5 +153,6 @@ gcloud builds submit --config cloudbuild.yaml
 - The Longevity Compass concept lives in [docs/product/longevity-compass.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/longevity-compass.md).
 - The Google-first target architecture lives in [docs/architecture/google-first-mvp.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/architecture/google-first-mvp.md).
 - The chosen MVP stack is Flutter + Firebase + Cloud Run + Vertex AI, with Lovable available as an optional prototyping accelerator.
+- Container builds now use the single root [Dockerfile](/Users/lauritz/git/Hackerthon-BCG-Platinum/Dockerfile).
 - The contributor operating guide lives in [AGENT.MD](/Users/lauritz/git/Hackerthon-BCG-Platinum/AGENT.MD).
 - Architectural decisions live in [docs/adr/README.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/README.md).

@@ -1,8 +1,8 @@
-# ADK Agent (Firestore-Connected)
+# ADK Agent Service
 
-This folder contains a Google Cloud ADK agent configured to use Firestore project:
-
-- `longevity-compass-firestore` (Firestore Native, region `eur3`)
+This folder contains the Google Cloud ADK-backed coaching service.
+It reads `FIREBASE_PROJECT_ID` from `.env.local` or the surrounding environment,
+and it can target a named Firestore database through `FIRESTORE_DATABASE_ID`.
 
 ## Capabilities
 
@@ -51,20 +51,27 @@ source .venv/bin/activate
 pip install -r agent/requirements.txt
 ```
 
-2. Authenticate for Firestore write access (one of):
+2. Copy the local env template if you have not done it yet:
+
+```bash
+cp .env.example .env.local
+```
+
+3. Authenticate for Firestore write access (one of):
    - `gcloud auth application-default login`
    - or set `GOOGLE_APPLICATION_CREDENTIALS` to a service account JSON key path.
 
-3. (Optional) Override project:
+4. Confirm the Firebase project and Firestore database in `.env.local`:
 
 ```bash
-export FIREBASE_PROJECT_ID=another-project-id
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIRESTORE_DATABASE_ID=longevity-compass-firestore
 ```
 
 ## Run
 
 ```bash
-python3 agent/main.py
+python3 -m agent.main
 ```
 
 If credentials are valid, a test document is created in Firestore collection
@@ -74,6 +81,15 @@ If credentials are valid, a test document is created in Firestore collection
 
 ```bash
 uvicorn agent.server:app --host 0.0.0.0 --port 8080
+```
+
+## Container
+
+Build from the repo root. The repo now uses a single Dockerfile:
+
+```bash
+docker build -t longevity-compass .
+docker run --rm -p 8080:8080 longevity-compass
 ```
 
 ### Endpoints (single central chat)

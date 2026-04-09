@@ -39,9 +39,10 @@ class DashboardScreen extends StatelessWidget {
             children: [
               ScreenHeader(
                 eyebrow: 'Longevity Compass',
-                title: 'Where you are now, and where you are heading.',
+                title:
+                    'Understand your health, then take one sensible next step.',
                 subtitle:
-                    'A six-pillar view that turns fragmented health data into one clear direction, one weekly plan, and one next-best support option.',
+                    'A new user should quickly see what the app already knows, what is still missing, and which next step is actually worth attention.',
                 trailing: _PatientPicker(
                   patients: controller.patients,
                   selectedPatientId: controller.selectedPatientId,
@@ -53,7 +54,137 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
+              if (experience.compass.peerComparison.hasItems) ...[
+                CompassRadarCard(experience: experience),
+                const SizedBox(height: 24),
+              ],
+              SectionSurface(
+                title: experience.journeyStart.title,
+                subtitle: experience.journeyStart.summary,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stacked = constraints.maxWidth < 900;
+                    final panels = [
+                      _JourneyPanel(
+                        title: 'What we already know',
+                        items: experience.journeyStart.whatWeKnow,
+                        color: AppPalette.mint,
+                      ),
+                      _JourneyPanel(
+                        title: 'What we still need',
+                        items: experience.journeyStart.whatWeNeed,
+                        color: AppPalette.sand,
+                      ),
+                      _JourneyPanel(
+                        title: 'Start here',
+                        items: experience.journeyStart.startHere,
+                        color: AppPalette.coral,
+                      ),
+                    ];
+
+                    if (stacked) {
+                      return Column(
+                        children: [
+                          for (var index = 0;
+                              index < panels.length;
+                              index++) ...[
+                            panels[index],
+                            if (index < panels.length - 1)
+                              const SizedBox(height: 12),
+                          ],
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (var index = 0; index < panels.length; index++) ...[
+                          Expanded(child: panels[index]),
+                          if (index < panels.length - 1)
+                            const SizedBox(width: 12),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
               CompassHeroCard(experience: experience),
+              const SizedBox(height: 24),
+              SectionSurface(
+                title: experience.careContext.lastAppointmentTitle,
+                subtitle: experience.careContext.headline,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      experience.careContext.lastAppointmentSummary,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            height: 1.45,
+                          ),
+                    ),
+                    if (experience.careContext.medications.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _InfoTagWrap(
+                        title: 'Medications on file',
+                        items: experience.careContext.medications,
+                      ),
+                    ],
+                    if (experience
+                        .careContext.clinicalPriorities.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _InfoTagWrap(
+                        title: 'What needs attention now',
+                        items: experience.careContext.clinicalPriorities,
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppPalette.sand.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        experience.careContext.medicalGuardrail,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              height: 1.4,
+                              color: AppPalette.ink,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              SectionSurface(
+                title: 'How personal the recommendations can be today',
+                subtitle: experience.dataCoverage.headline,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _DataCoverageRow(
+                      title: 'Connected data',
+                      items: experience.dataCoverage.connectedSources,
+                    ),
+                    const SizedBox(height: 16),
+                    _DataCoverageRow(
+                      title: 'Still missing',
+                      items: experience.dataCoverage.missingSources,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      experience.dataCoverage.tailoringNote,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            height: 1.45,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 24),
               SectionSurface(
                 title: 'Six pillars',
@@ -95,7 +226,8 @@ class DashboardScreen extends StatelessWidget {
                   builder: (context, constraints) {
                     final stacked = constraints.maxWidth < 760;
                     final children = experience.progressSummary.headlineTrends
-                        .map((trend) => Expanded(child: MetricTrendTile(trend: trend)))
+                        .map((trend) =>
+                            Expanded(child: MetricTrendTile(trend: trend)))
                         .toList(growable: false);
 
                     if (stacked) {
@@ -114,7 +246,9 @@ class DashboardScreen extends StatelessWidget {
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        for (var index = 0; index < children.length; index++) ...[
+                        for (var index = 0;
+                            index < children.length;
+                            index++) ...[
                           if (index > 0) const SizedBox(width: 12),
                           children[index],
                         ],
@@ -125,9 +259,9 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               SectionSurface(
-                title: 'Flags and opportunities',
+                title: 'Flags and next-best support',
                 subtitle:
-                    'High-priority drift should lead to simple action, not confusion.',
+                    'High-priority drift should lead to one understandable next step, not a wall of options.',
                 child: Column(
                   children: [
                     for (final flag in experience.alerts.items) ...[
@@ -156,6 +290,169 @@ class DashboardScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _JourneyPanel extends StatelessWidget {
+  const _JourneyPanel({
+    required this.title,
+    required this.items,
+    required this.color,
+  });
+
+  final String title;
+  final List<String> items;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppPalette.ink,
+                ),
+          ),
+          const SizedBox(height: 12),
+          for (var index = 0; index < items.length; index++) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Icon(
+                    Icons.circle,
+                    size: 8,
+                    color: AppPalette.forest,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    items[index],
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppPalette.ink.withValues(alpha: 0.78),
+                          height: 1.45,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            if (index < items.length - 1) const SizedBox(height: 10),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoTagWrap extends StatelessWidget {
+  const _InfoTagWrap({
+    required this.title,
+    required this.items,
+  });
+
+  final String title;
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppPalette.ink,
+              ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: items
+              .map(
+                (item) => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.84),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Text(item),
+                ),
+              )
+              .toList(growable: false),
+        ),
+      ],
+    );
+  }
+}
+
+class _DataCoverageRow extends StatelessWidget {
+  const _DataCoverageRow({
+    required this.title,
+    required this.items,
+  });
+
+  final String title;
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppPalette.ink,
+              ),
+        ),
+        const SizedBox(height: 10),
+        for (var index = 0; index < items.length; index++) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                title == 'Connected data'
+                    ? Icons.check_circle_rounded
+                    : Icons.warning_amber_rounded,
+                size: 18,
+                color: title == 'Connected data'
+                    ? AppPalette.forest
+                    : AppPalette.amber,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  items[index],
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppPalette.ink.withValues(alpha: 0.76),
+                        height: 1.4,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          if (index < items.length - 1) const SizedBox(height: 10),
+        ],
+      ],
     );
   }
 }
