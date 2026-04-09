@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../config/app_config.dart';
 import '../../firebase_options.dart';
+import 'firebase_session_service.dart';
 
 class FirebaseBootstrap {
   static Future<void> initialize() async {
@@ -15,10 +16,12 @@ class FirebaseBootstrap {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await FirebaseSessionService.instance.ensureSignedIn();
     await FirebaseAnalytics.instance.logAppOpen();
 
     if (!kIsWeb) {
-      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+      FlutterError.onError =
+          FirebaseCrashlytics.instance.recordFlutterFatalError;
     }
   }
 }

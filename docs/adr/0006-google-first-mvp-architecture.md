@@ -24,7 +24,7 @@ An architect review on April 9, 2026 also refined the desired runtime split:
 
 - the app can talk directly to Firebase plus Firestore for lightweight MVP state
 - the agent runtime should still sit behind a backend container
-- relational context should not be forced into Firestore
+- all relational and analytical context should be stored in Firestore for simplicity in the 1-day hackathon
 - Google-managed agent and retrieval primitives should be preferred over custom glue code
 
 ## Decision
@@ -42,8 +42,7 @@ Use a Google-first target architecture for the MVP:
 - Cloud Run for backend services and the ADK-hosted agent runtime
 - Python as the default agent implementation language because ADK support is strongest there
 - ADK runner or REST wrapper as the standard agent-facing interface
-- BigQuery for cloud analytics tables and relational context used by the agent
-- optional AI Applications datastore or equivalent managed retrieval layer over BigQuery-derived content
+- optional managed retrieval layer over Firestore-derived content or Cloud Storage assets
 - Vertex AI for the AI coach or chatbot and as the default model endpoint behind the agent
 - Gemini Flash as the default model choice unless a better fit is recorded
 - Cloud Storage for raw files and evidence assets
@@ -53,8 +52,7 @@ Use this responsibility split by default:
 
 - app to Firestore for lightweight product state
 - app to Cloud Run over REST for agent access and protected logic
-- Cloud Run agent service to Firestore for stateful updates
-- Cloud Run agent service to BigQuery for relational and analytical reads
+- Cloud Run agent service to Firestore for stateful updates and analytical reads
 
 Lovable is allowed as a rapid prototyping accelerator for selected web or concept surfaces, but it is not the core application architecture.
 
@@ -70,7 +68,7 @@ Keep DuckDB locally as the fastest development environment until the product flo
   local for rapid iteration, Google-native for deployment.
 - The MVP gets a faster path because basic app state can skip a full backend-for-frontend layer.
 - The architecture becomes explicitly chat-first, not just API-first.
-- Firestore stays a product-state store, while BigQuery becomes the place for relational and analytical context.
+- Firestore becomes the unified store for product state, analytical context, and relational data for the MVP.
 - The MVP accepts weaker validation on direct client writes unless rules and backend boundaries are tightened later.
 
 ## Alternatives Considered

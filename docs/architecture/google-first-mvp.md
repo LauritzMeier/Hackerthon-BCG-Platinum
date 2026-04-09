@@ -8,7 +8,7 @@ The architect review on April 9, 2026 refined that direction into a more specifi
 
 - the mobile app can talk directly to Firebase for lightweight MVP state
 - the agent runtime should still live behind a backend container on Cloud Run
-- relational and analytical context should stay outside Firestore and be read via backend tools
+- all application and analytical context should be stored in Firestore for MVP simplicity
 - the primary user journey should be chat-first rather than screen-first
 
 Local DuckDB remains useful for rapid prototyping, but the primary deployment direction is Google-native because:
@@ -41,7 +41,7 @@ The current chosen MVP stack is:
 - Firebase
 - Cloud Run
 - ADK on Cloud Run
-- BigQuery
+- Firebase
 - Vertex AI
 
 This should be treated as the default implementation direction unless we explicitly record a new ADR.
@@ -118,13 +118,12 @@ Default model choice:
 
 ### Data Layer
 
-- BigQuery for cloud analytical tables, wearable and clinical context, pillar state tables, and trajectory features
-- Firestore for app state, chat threads, goals, plans, and lightweight realtime product state
+- Firestore for app state, chat threads, goals, plans, wearable/clinical context, and analytical state
 - Cloud Storage for raw files, exports, and supporting assets
 
 Optional managed retrieval layer:
 
-- Google Cloud AI Applications data stores or equivalent managed datastore-backed retrieval over BigQuery exports when we want low-custom-code RAG
+- Google Cloud AI Applications data stores or equivalent managed datastore-backed retrieval over Firestore or Storage when we want low-custom-code RAG
 
 ### Engagement And Measurement
 
@@ -145,11 +144,10 @@ Use Vertex AI for:
 - converting flags into understandable action
 - serving the model used by the ADK-hosted agent
 
-Use Firestore and BigQuery through tools rather than feeding raw tables straight into prompts:
+Use Firestore through tools rather than feeding raw tables straight into prompts:
 
-1. Firestore-backed product state and conversation state
-2. BigQuery-backed analytical and relational context
-3. optional managed datastore or RAG endpoint over BigQuery-derived content
+1. Firestore-backed product state, conversation state, and clinical/analytical context
+2. optional managed datastore or RAG endpoint over Firestore-derived content
 4. internal product or evidence content
 5. optional public grounding only for non-patient-specific wellness explanations
 
@@ -159,7 +157,7 @@ The architect recommendation is a split interaction model:
 
 1. Flutter app talks directly to Firestore through the Firebase SDK for lightweight MVP state
 2. Flutter app talks to Cloud Run over REST for agent execution and protected business logic
-3. Cloud Run agent service reads Firestore for current state and BigQuery for relational context
+3. Cloud Run agent service reads Firestore for current state and user context
 4. Cloud Run agent service calls Vertex AI for reasoning
 5. Agent tools write back to Firestore when goals, timeline items, or chat state need to change
 
@@ -200,9 +198,6 @@ flowchart LR
     M --> API["Cloud Run Agent / API Container"]
     W --> API
     API --> FS
-    API --> BQ["BigQuery"]
-    BQ --> RAG["AI Applications Datastore / RAG (optional)"]
-    API --> RAG
     API --> VAI["Vertex AI / Gemini"]
     API --> GCS["Cloud Storage"]
     JOBS["Cloud Scheduler / Cloud Run Jobs"] --> API
@@ -244,7 +239,7 @@ The current repo should support this path:
 3. Flutter app source checked into `apps/longevity_compass/`
 4. Firebase for authentication, analytics, notifications, crash monitoring, and direct Firestore-backed app state
 5. Cloud Run as the deployment target for the Python API and future ADK runner service
-6. BigQuery as the target hosted store for relational and analytical context used by the agent
+6. Firestore as the unified store for app state, analytical context, and relational data
 7. Vertex AI as the target model endpoint behind the agent
 
 The Flutter app can be scaffolded in source form before generated platform folders are added. Once the Flutter toolchain is available, run `flutter create . --platforms=ios,android,web` inside the app directory to generate the platform shell around the checked-in app code.
@@ -259,9 +254,9 @@ The Flutter app can be scaffolded in source form before generated platform folde
 6. Build the core Flutter app for iOS and Android
 7. Let the app read and write lightweight MVP state through Firebase SDK plus Firestore
 8. Move hosted APIs and the ADK runtime to Cloud Run
-9. Move cloud analytical tables to BigQuery
+9. Finalize six-pillar compass payloads and trajectory logic in Firestore
 10. Add Vertex AI coach orchestration and ADK tools
-11. Add optional managed RAG over BigQuery-derived content if retrieval quality becomes important
+11. Add optional managed RAG over Firestore-derived content if retrieval quality becomes important
 12. Use Lovable only if it helps accelerate selected web or concept flows
 
 ## MVP Tradeoffs
@@ -269,7 +264,7 @@ The Flutter app can be scaffolded in source form before generated platform folde
 This architecture intentionally accepts some MVP shortcuts:
 
 - direct app-to-Firestore access is faster to ship than routing every action through backend validation
-- Firestore is not the analytical source of truth for wearable or clinical data
+- Firestore is the primary source of truth for all MVP data including analytical context
 - agent writes should still be routed through backend tools, not granted as arbitrary client privileges
 
 Before any production hardening pass, we should tighten:
@@ -290,7 +285,6 @@ Before any production hardening pass, we should tighten:
 - [Firebase Remote Config](https://firebase.google.com/docs/remote-config)
 - [Firebase Crashlytics](https://firebase.google.com/docs/crashlytics)
 - [Cloud Run](https://cloud.google.com/run)
-- [BigQuery](https://cloud.google.com/bigquery?hl=com)
 - [Cloud Storage](https://cloud.google.com/storage/docs/objects)
 - [Vertex AI Overview](https://docs.cloud.google.com/vertex-ai/docs/start/introduction-unified-platform)
 - [Cloud Monitoring](https://docs.cloud.google.com/monitoring/docs)

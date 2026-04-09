@@ -5,8 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/_app_env.sh"
 
-DEVICE_ID="${IOS_DEVICE_ID:-}"
-SIMULATOR_ID="${IOS_SIMULATOR_ID:-$DEFAULT_IOS_EMULATOR_ID}"
+DEVICE_ID="${WEB_DEVICE_ID:-chrome}"
 API_BASE_URL="${APP_API_BASE_URL:-http://127.0.0.1:8000}"
 ENABLE_FIREBASE="${APP_ENABLE_FIREBASE:-auto}"
 FIREBASE_PROJECT_ID_FLAG="${FIREBASE_PROJECT_ID:-}"
@@ -17,27 +16,21 @@ EXTRA_ARGS=()
 
 usage() {
   cat <<EOF
-Usage: ./scripts/run_ios.sh [options] [-- flutter_run_args...]
+Usage: ./scripts/run_web.sh [options] [-- flutter_run_args...]
 
 Defaults:
-  - Launches the Apple iOS Simulator.
-  - Runs the Flutter app with localhost API access.
+  - Launches the Flutter web app on Chrome.
+  - Runs with the local API base URL.
   - Enables Firebase automatically if the app is already configured.
 
 Options:
-  --device-id ID                Use a specific iOS device id instead of the simulator default.
-  --simulator-id ID             Launch a specific Flutter iOS simulator id.
+  --device-id ID                Use a specific Flutter web device id.
   --api-base-url URL            Override the API base URL.
   --firebase-project PROJECT    Configure Firebase before launch and enable it.
   --enable-firebase             Enable Firebase if config is present.
   --no-firebase                 Disable Firebase even if config is present.
   --dry-run                     Print the final flutter command without running it.
   --help                        Show this help text.
-
-Examples:
-  ./scripts/run_ios.sh
-  ./scripts/run_ios.sh --device-id ios
-  ./scripts/run_ios.sh --firebase-project my-firebase-project
 EOF
 }
 
@@ -45,10 +38,6 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --device-id)
       DEVICE_ID="$2"
-      shift 2
-      ;;
-    --simulator-id)
-      SIMULATOR_ID="$2"
       shift 2
       ;;
     --api-base-url)
@@ -116,19 +105,6 @@ if [[ "$ENABLE_FIREBASE" == "true" ]] && ! firebase_is_configured; then
   die "Firebase is enabled but the app is not configured yet. Run ./scripts/setup_firebase.sh --project <firebase-project-id> first."
 fi
 
-TARGET_DEVICE_ID="$DEVICE_ID"
-if [[ -z "$TARGET_DEVICE_ID" ]]; then
-  if [[ "$DRY_RUN" == "true" ]]; then
-    TARGET_DEVICE_ID="ios"
-  else
-    run_in_app flutter emulators --launch "$SIMULATOR_ID"
-    TARGET_DEVICE_ID="$(wait_for_flutter_device ios "" 120 || true)"
-    if [[ -z "$TARGET_DEVICE_ID" ]]; then
-      TARGET_DEVICE_ID="ios"
-    fi
-  fi
-fi
-
 if [[ "$DRY_RUN" != "true" ]]; then
   ensure_local_api_warning "$API_BASE_URL"
 fi
@@ -136,7 +112,7 @@ fi
 CMD=(
   flutter
   run
-  -d "$TARGET_DEVICE_ID"
+  -d "$DEVICE_ID"
   --dart-define=APP_API_BASE_URL="$API_BASE_URL"
 )
 
@@ -152,7 +128,7 @@ if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
   CMD+=("${EXTRA_ARGS[@]}")
 fi
 
-log "Target iOS device: ${TARGET_DEVICE_ID}"
+log "Target web device: ${DEVICE_ID}"
 log "API base URL: ${API_BASE_URL}"
 log "Firebase enabled: ${ENABLE_FIREBASE}"
 log "Firestore database: ${FIRESTORE_DATABASE_ID:-"(default)"}"

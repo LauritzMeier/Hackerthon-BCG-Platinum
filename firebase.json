@@ -1,0 +1,12 @@
+{
+  "firestore": [
+    {
+      "database": "(default)",
+      "rules": "firestore.rules"
+    },
+    {
+      "database": "longevity-compass-firestore",
+      "rules": "firestore.rules"
+    }
+  ]
+}

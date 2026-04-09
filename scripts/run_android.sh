@@ -11,6 +11,7 @@ EMULATOR_ID="${ANDROID_EMULATOR_ID:-$DEFAULT_ANDROID_EMULATOR_ID}"
 API_BASE_URL="${APP_API_BASE_URL:-}"
 ENABLE_FIREBASE="${APP_ENABLE_FIREBASE:-auto}"
 FIREBASE_PROJECT_ID_FLAG="${FIREBASE_PROJECT_ID:-}"
+FIRESTORE_DATABASE_ID="${FIRESTORE_DATABASE_ID:-}"
 SHOULD_RUN_FIREBASE_SETUP="false"
 DRY_RUN="false"
 EXTRA_ARGS=()
@@ -174,6 +175,10 @@ if [[ "$ENABLE_FIREBASE" == "true" ]]; then
   CMD+=(--dart-define=APP_ENABLE_FIREBASE=true)
 fi
 
+if [[ -n "$FIRESTORE_DATABASE_ID" ]]; then
+  CMD+=(--dart-define=APP_FIRESTORE_DATABASE_ID="$FIRESTORE_DATABASE_ID")
+fi
+
 if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
   CMD+=("${EXTRA_ARGS[@]}")
 fi
@@ -181,6 +186,7 @@ fi
 log "Target Android device: ${TARGET_DEVICE_ID}"
 log "API base URL: ${API_BASE_URL}"
 log "Firebase enabled: ${ENABLE_FIREBASE}"
+log "Firestore database: ${FIRESTORE_DATABASE_ID:-"(default)"}"
 
 if [[ "$DRY_RUN" == "true" ]]; then
   printf 'cd %q &&' "$APP_DIR"
