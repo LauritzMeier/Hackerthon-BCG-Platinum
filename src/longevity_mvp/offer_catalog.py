@@ -243,6 +243,102 @@ _OFFER_CATALOG = {
         "active": True,
         "sort_order": 34,
     },
+    "longevity_intake_visit": {
+        "offer_label": "Longevity intake visit",
+        "category": "Intake visit",
+        "offer_type": "appointment",
+        "delivery_model": "Clinic or video visit",
+        "summary": "Start with a clinician-led intake that turns your goals, history, and first data sources into a practical roadmap.",
+        "why_now_template": (
+            "This is the best first clinical step when someone is new to the app and wants a real starting point instead of generic content."
+        ),
+        "includes": [
+            "Review of goals, concerns, and current health priorities",
+            "A plan for which data sources matter first and which can wait",
+            "A short list of the first actions or diagnostics worth doing next",
+        ],
+        "expected_outcome": "You leave with a clear first roadmap instead of trying to figure out the whole journey alone.",
+        "time_commitment": "45 minute intake visit.",
+        "data_used": [
+            "starting goals",
+            "any connected records or devices",
+        ],
+        "missing_data": [],
+        "first_week": [
+            "Book the intake",
+            "Connect one data source before the visit if possible",
+            "Write down the main outcome you want from the program",
+        ],
+        "caution_template": "If you already have active clinical care, bring that context into the intake so recommendations stay aligned.",
+        "personalization_note": "Best for a new user who wants a confident first step.",
+        "cta_label": "Book intake",
+        "active": True,
+        "sort_order": 70,
+    },
+    "baseline_lab_workup": {
+        "offer_label": "Baseline lab workup",
+        "category": "Diagnostics",
+        "offer_type": "diagnostic",
+        "delivery_model": "Lab appointment",
+        "summary": "Create a clean health baseline so the app and clinic team can personalize from real markers, not assumptions.",
+        "why_now_template": (
+            "This is useful early when the user has little connected data and wants the next recommendations to be anchored in objective markers."
+        ),
+        "includes": [
+            "Core metabolic and cardiovascular baseline testing",
+            "A clinician-ready summary of the main markers to review",
+            "A clearer handoff into follow-up, prevention, or recovery support",
+        ],
+        "expected_outcome": "The next recommendations can lean on real lab context instead of broad starter guidance.",
+        "time_commitment": "One lab draw plus a short review.",
+        "data_used": [
+            "starting profile information",
+            "baseline health goals",
+        ],
+        "missing_data": [],
+        "first_week": [
+            "Book the lab appointment",
+            "Follow any fasting instructions you receive",
+            "Review the results in the app or with the clinic team",
+        ],
+        "caution_template": "Use this to build a baseline, not as a substitute for urgent medical care.",
+        "personalization_note": "High value early when almost no longitudinal data is connected yet.",
+        "cta_label": "Book baseline labs",
+        "active": True,
+        "sort_order": 72,
+    },
+    "cardiovascular_screening_visit": {
+        "offer_label": "Cardiovascular screening visit",
+        "category": "Preventive cardiology",
+        "offer_type": "appointment",
+        "delivery_model": "Specialist review",
+        "summary": "Start with a focused cardiovascular screening if heart risk or prevention is one of the main reasons for joining.",
+        "why_now_template": (
+            "This is a strong early option when the customer wants a heart-health oriented entry point before broader personalization builds up."
+        ),
+        "includes": [
+            "Review of family history, symptoms, and baseline risk factors",
+            "Decision on whether labs, imaging, or follow-up are worth doing next",
+            "A practical prevention or recovery plan to build from",
+        ],
+        "expected_outcome": "You understand whether cardiovascular screening should lead your journey or sit behind other priorities.",
+        "time_commitment": "30 to 45 minute screening visit.",
+        "data_used": [
+            "goals and intake context",
+            "any available medical history",
+        ],
+        "missing_data": [],
+        "first_week": [
+            "Book the screening visit",
+            "Bring any prior heart-related records if you have them",
+            "List the symptoms or risks you most want clarified",
+        ],
+        "caution_template": "Use this to clarify risk and next steps, especially if heart health is the main reason for joining.",
+        "personalization_note": "Best when prevention or cardiovascular clarity is top of mind from day one.",
+        "cta_label": "Book screening",
+        "active": True,
+        "sort_order": 74,
+    },
     "sleep_recovery_package": {
         "offer_label": "Sleep and recovery reset",
         "category": "Recovery support",

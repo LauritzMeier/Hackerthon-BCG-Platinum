@@ -155,7 +155,9 @@ if [[ "$MODE" == "physical" ]]; then
     require_cmd adb
     adb reverse tcp:8000 tcp:8000 >/dev/null
   fi
-  API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:8000}"
+  if [[ "$ENABLE_FIREBASE" != "true" ]]; then
+    API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:8000}"
+  fi
 else
   if [[ "$DRY_RUN" == "true" ]]; then
     TARGET_DEVICE_ID="${DEVICE_ID:-android}"
@@ -164,7 +166,9 @@ else
     TARGET_DEVICE_ID="$(wait_for_flutter_device android-emulator "" 120 || true)"
     [[ -n "$TARGET_DEVICE_ID" ]] || die "Android emulator did not appear in Flutter devices."
   fi
-  API_BASE_URL="${API_BASE_URL:-http://10.0.2.2:8000}"
+  if [[ "$ENABLE_FIREBASE" != "true" ]]; then
+    API_BASE_URL="${API_BASE_URL:-http://10.0.2.2:8000}"
+  fi
 fi
 
 if [[ "$DRY_RUN" != "true" && "$ENABLE_FIREBASE" != "true" ]]; then
@@ -175,8 +179,11 @@ CMD=(
   flutter
   run
   -d "$TARGET_DEVICE_ID"
-  --dart-define=APP_API_BASE_URL="$API_BASE_URL"
 )
+
+if [[ -n "$API_BASE_URL" ]]; then
+  CMD+=(--dart-define=APP_API_BASE_URL="$API_BASE_URL")
+fi
 
 if [[ -n "$AGENT_BASE_URL" ]]; then
   CMD+=(--dart-define=APP_AGENT_BASE_URL="$AGENT_BASE_URL")
@@ -195,7 +202,7 @@ if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
 fi
 
 log "Target Android device: ${TARGET_DEVICE_ID}"
-log "API base URL: ${API_BASE_URL}"
+log "API base URL: ${API_BASE_URL:-"(not set)"}"
 log "Agent base URL: ${AGENT_BASE_URL:-"(not set)"}"
 log "Firebase enabled: ${ENABLE_FIREBASE}"
 log "Firestore database: ${FIRESTORE_DATABASE_ID:-"(default)"}"

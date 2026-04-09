@@ -669,6 +669,184 @@ class OfferOpportunity {
   }
 }
 
+class CustomerProfile {
+  CustomerProfile({
+    required this.patientId,
+    required this.displayName,
+    required this.journeyStage,
+    required this.journeyTitle,
+    required this.journeySummary,
+    required this.possibilities,
+    required this.dataSources,
+    required this.updatedAt,
+  });
+
+  factory CustomerProfile.fromJson(Map<String, dynamic> json) {
+    return CustomerProfile(
+      patientId: _asString(json['patient_id']),
+      displayName: _asString(json['display_name']),
+      journeyStage: _asString(json['journey_stage']),
+      journeyTitle: _asString(json['journey_title']),
+      journeySummary: _asString(json['journey_summary']),
+      possibilities: _asStringList(json['possibilities']),
+      dataSources: _asObjectList(
+        json['data_sources'],
+        DataSourceConnection.fromJson,
+      ),
+      updatedAt: _asDateTime(json['updated_at']),
+    );
+  }
+
+  final String patientId;
+  final String displayName;
+  final String journeyStage;
+  final String journeyTitle;
+  final String journeySummary;
+  final List<String> possibilities;
+  final List<DataSourceConnection> dataSources;
+  final DateTime? updatedAt;
+
+  bool get isWelcomeJourney => journeyStage == 'welcome';
+
+  int get connectedSourceCount =>
+      dataSources.where((source) => source.connected).length;
+
+  List<DataSourceConnection> get connectedSources =>
+      dataSources.where((source) => source.connected).toList(growable: false);
+
+  List<DataSourceConnection> get disconnectedSources =>
+      dataSources.where((source) => !source.connected).toList(growable: false);
+
+  CustomerProfile copyWith({
+    String? patientId,
+    String? displayName,
+    String? journeyStage,
+    String? journeyTitle,
+    String? journeySummary,
+    List<String>? possibilities,
+    List<DataSourceConnection>? dataSources,
+    DateTime? updatedAt,
+  }) {
+    return CustomerProfile(
+      patientId: patientId ?? this.patientId,
+      displayName: displayName ?? this.displayName,
+      journeyStage: journeyStage ?? this.journeyStage,
+      journeyTitle: journeyTitle ?? this.journeyTitle,
+      journeySummary: journeySummary ?? this.journeySummary,
+      possibilities: possibilities ?? this.possibilities,
+      dataSources: dataSources ?? this.dataSources,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}
+
+class DataSourceConnection {
+  DataSourceConnection({
+    required this.sourceId,
+    required this.label,
+    required this.category,
+    required this.connected,
+    required this.provider,
+    required this.statusText,
+    required this.ctaLabel,
+  });
+
+  factory DataSourceConnection.fromJson(Map<String, dynamic> json) {
+    return DataSourceConnection(
+      sourceId: _asString(json['source_id']),
+      label: _asString(json['label']),
+      category: _asString(json['category']),
+      connected: _asBool(json['connected']),
+      provider: _asString(json['provider']),
+      statusText: _asString(json['status_text']),
+      ctaLabel: _asString(json['cta_label']),
+    );
+  }
+
+  final String sourceId;
+  final String label;
+  final String category;
+  final bool connected;
+  final String provider;
+  final String statusText;
+  final String ctaLabel;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'source_id': sourceId,
+      'label': label,
+      'category': category,
+      'connected': connected,
+      'provider': provider,
+      'status_text': statusText,
+      'cta_label': ctaLabel,
+    };
+  }
+
+  DataSourceConnection copyWith({
+    String? sourceId,
+    String? label,
+    String? category,
+    bool? connected,
+    String? provider,
+    String? statusText,
+    String? ctaLabel,
+  }) {
+    return DataSourceConnection(
+      sourceId: sourceId ?? this.sourceId,
+      label: label ?? this.label,
+      category: category ?? this.category,
+      connected: connected ?? this.connected,
+      provider: provider ?? this.provider,
+      statusText: statusText ?? this.statusText,
+      ctaLabel: ctaLabel ?? this.ctaLabel,
+    );
+  }
+}
+
+class SupportBooking {
+  SupportBooking({
+    required this.bookingId,
+    required this.patientId,
+    required this.offerCode,
+    required this.offerLabel,
+    required this.offerType,
+    required this.deliveryModel,
+    required this.status,
+    required this.scheduledFor,
+    required this.scheduledLabel,
+    required this.createdAt,
+  });
+
+  factory SupportBooking.fromJson(Map<String, dynamic> json) {
+    return SupportBooking(
+      bookingId: _asString(json['booking_id']),
+      patientId: _asString(json['patient_id']),
+      offerCode: _asString(json['offer_code']),
+      offerLabel: _asString(json['offer_label']),
+      offerType: _asString(json['offer_type']),
+      deliveryModel: _asString(json['delivery_model']),
+      status: _asString(json['status']),
+      scheduledFor: _asDateTime(json['scheduled_for']),
+      scheduledLabel: _asString(json['scheduled_label']),
+      createdAt: _asDateTime(json['created_at']),
+    );
+  }
+
+  final String bookingId;
+  final String patientId;
+  final String offerCode;
+  final String offerLabel;
+  final String offerType;
+  final String deliveryModel;
+  final String status;
+  final DateTime? scheduledFor;
+  final String scheduledLabel;
+  final DateTime? createdAt;
+
+  bool get isBooked => status == 'booked';
+}
+
 class CoachReply {
   CoachReply({required this.reply, required this.primaryFocus});
 

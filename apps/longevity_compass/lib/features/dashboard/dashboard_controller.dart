@@ -16,6 +16,8 @@ class DashboardController extends ChangeNotifier {
   String? errorMessage;
   List<PatientListItem> patients = <PatientListItem>[];
   ExperienceSnapshot? experience;
+  CustomerProfile? customerProfile;
+  List<SupportBooking> supportBookings = <SupportBooking>[];
   List<ChatMessage> chatMessages = <ChatMessage>[];
   String? selectedPatientId;
   String? firebaseUserId;
@@ -95,6 +97,8 @@ class DashboardController extends ChangeNotifier {
         patientId,
         trimmed,
         experience: currentExperience,
+        customerProfile: customerProfile,
+        supportBookings: supportBookings,
       );
       final assistantMessage = ChatMessage.assistant(reply.reply);
       chatMessages = <ChatMessage>[...chatMessages, assistantMessage];
@@ -124,9 +128,100 @@ class DashboardController extends ChangeNotifier {
 
   bool get isFirebaseEnabled => _repository.isFirebaseEnabled;
 
+  bool get isWelcomeJourney => customerProfile?.isWelcomeJourney ?? false;
+
+  bool get hasStartedOnboarding =>
+      (customerProfile?.connectedSourceCount ?? 0) > 0 ||
+      supportBookings.isNotEmpty;
+
+  bool get shouldShowWelcomeGuide =>
+      isWelcomeJourney &&
+      !hasStartedOnboarding &&
+      (customerProfile?.disconnectedSources.isNotEmpty ?? false);
+
   String get firestoreMessagesPath {
     final patientId = selectedPatientId ?? '<patient-id>';
     return 'coach_conversations/$patientId/messages';
+  }
+
+  SupportBooking? bookingForOffer(String offerCode) {
+    for (final booking in supportBookings) {
+      if (booking.offerCode == offerCode && booking.isBooked) {
+        return booking;
+      }
+    }
+    return null;
+  }
+
+  Future<SupportBooking?> bookSupportOffer({
+    required OfferOpportunity offer,
+    required DateTime scheduledFor,
+    required String scheduledLabel,
+  }) async {
+    final patientId = selectedPatientId;
+    final existing = bookingForOffer(offer.offerCode);
+    if (patientId == null) {
+      return null;
+    }
+    if (existing != null) {
+      return existing;
+    }
+
+    try {
+      final booking = await _repository.createSupportBooking(
+        patientId: patientId,
+        offer: offer,
+        scheduledFor: scheduledFor,
+        scheduledLabel: scheduledLabel,
+      );
+      supportBookings = <SupportBooking>[
+        ...supportBookings,
+        booking,
+      ]..sort((a, b) {
+          final aDate = a.scheduledFor;
+          final bDate = b.scheduledFor;
+          if (aDate == null && bDate == null) {
+            return a.offerLabel.compareTo(b.offerLabel);
+          }
+          if (aDate == null) {
+            return 1;
+          }
+          if (bDate == null) {
+            return -1;
+          }
+          return aDate.compareTo(bDate);
+        });
+      return booking;
+    } catch (error) {
+      errorMessage = error.toString();
+      return null;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateDataSourceConnection({
+    required String sourceId,
+    required bool connected,
+    String? provider,
+  }) async {
+    final currentProfile = customerProfile;
+    if (currentProfile == null) {
+      return;
+    }
+
+    try {
+      customerProfile = await _repository.updateDataSourceConnection(
+        profile: currentProfile,
+        sourceId: sourceId,
+        connected: connected,
+        provider: provider,
+      );
+    } catch (error) {
+      errorMessage = error.toString();
+    } finally {
+      notifyListeners();
+    }
   }
 
   Future<void> _initializeFirebaseSession() async {
@@ -167,6 +262,11 @@ class DashboardController extends ChangeNotifier {
     }
 
     experience = await _repository.fetchExperience(patientId);
+    customerProfile = await _repository.fetchCustomerProfile(
+      patientId,
+      experience: experience,
+    );
+    supportBookings = await _repository.fetchSupportBookings(patientId);
     final storedMessages = await _repository.fetchChatMessages(patientId);
     chatMessages = storedMessages.isNotEmpty
         ? storedMessages
