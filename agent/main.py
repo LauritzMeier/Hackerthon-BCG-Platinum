@@ -12,7 +12,12 @@ from firebase_client import push_test_message
 
 load_dotenv(".env.local")
 load_dotenv()
-os.environ.setdefault("FIREBASE_PROJECT_ID", "longevity-compass-firestore")
+
+# Prioritize environment variable, fallback to the hackathon default
+PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "longevity-compass-firestore")
+os.environ["FIREBASE_PROJECT_ID"] = PROJECT_ID
+
+print(f"--- Agent initialized for Project: {PROJECT_ID} ---")
 
 
 def write_message_to_firebase(message: str) -> Dict[str, Any]:
