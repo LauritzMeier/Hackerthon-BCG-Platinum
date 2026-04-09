@@ -42,9 +42,7 @@ class _CompassShellState extends State<CompassShell> {
   @override
   void initState() {
     super.initState();
-    _controller = DashboardController(
-      repository: ExperienceRepository(),
-    );
+    _controller = DashboardController(repository: ExperienceRepository());
     _pageController = PageController(initialPage: _currentIndex);
     _controller.load();
   }
@@ -85,8 +83,8 @@ class _CompassShellState extends State<CompassShell> {
                 final useFrame = constraints.maxWidth >= 720;
                 final shellWidth = useFrame
                     ? (constraints.maxWidth * 0.58)
-                        .clamp(440.0, 620.0)
-                        .toDouble()
+                          .clamp(440.0, 620.0)
+                          .toDouble()
                     : constraints.maxWidth;
 
                 return Center(
@@ -96,10 +94,12 @@ class _CompassShellState extends State<CompassShell> {
                       constraints: BoxConstraints(maxWidth: shellWidth),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Colors.white
-                              .withValues(alpha: useFrame ? 0.14 : 0),
-                          borderRadius:
-                              BorderRadius.circular(useFrame ? 42 : 0),
+                          color: Colors.white.withValues(
+                            alpha: useFrame ? 0.14 : 0,
+                          ),
+                          borderRadius: BorderRadius.circular(
+                            useFrame ? 42 : 0,
+                          ),
                           border: useFrame
                               ? Border.all(
                                   color: Colors.white.withValues(alpha: 0.42),
@@ -108,8 +108,9 @@ class _CompassShellState extends State<CompassShell> {
                           boxShadow: useFrame
                               ? [
                                   BoxShadow(
-                                    color:
-                                        AppPalette.ink.withValues(alpha: 0.12),
+                                    color: AppPalette.ink.withValues(
+                                      alpha: 0.12,
+                                    ),
                                     blurRadius: 36,
                                     offset: const Offset(0, 18),
                                   ),
@@ -117,8 +118,9 @@ class _CompassShellState extends State<CompassShell> {
                               : null,
                         ),
                         child: ClipRRect(
-                          borderRadius:
-                              BorderRadius.circular(useFrame ? 42 : 0),
+                          borderRadius: BorderRadius.circular(
+                            useFrame ? 42 : 0,
+                          ),
                           child: DecoratedBox(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
@@ -183,9 +185,7 @@ class _ShellDestination {
 }
 
 class _ShellBackdrop extends StatelessWidget {
-  const _ShellBackdrop({
-    required this.child,
-  });
+  const _ShellBackdrop({required this.child});
 
   final Widget child;
 
@@ -194,10 +194,7 @@ class _ShellBackdrop extends StatelessWidget {
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Color(0xFFF6F0E7),
-            Color(0xFFEAE7DD),
-          ],
+          colors: [Color(0xFFF6F0E7), Color(0xFFEAE7DD)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -236,10 +233,7 @@ class _ShellBackdrop extends StatelessWidget {
 }
 
 class _GlowOrb extends StatelessWidget {
-  const _GlowOrb({
-    required this.size,
-    required this.color,
-  });
+  const _GlowOrb({required this.size, required this.color});
 
   final double size;
   final Color color;
@@ -249,10 +243,7 @@ class _GlowOrb extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }
@@ -268,67 +259,70 @@ class _ShellTopBar extends StatelessWidget {
       builder: (context, controller, _) {
         final experience = controller.experience;
         final patientMeta = experience == null
-            ? 'Loading your profile'
+            ? 'Loading demo profile'
             : '${experience.profileSummary.patientId} • ${experience.profileSummary.age} • ${experience.profileSummary.country}';
         final summary = experience == null
             ? 'Bringing your care context into view.'
-            : 'Main goal this week: ${experience.weeklyPlan.primaryFocus.pillarName}.';
+            : 'This week: ${experience.weeklyPlan.primaryFocus.pillarName}.';
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.68),
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(24),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                         'Longevity Compass',
                         style: textTheme.titleMedium?.copyWith(
                           color: AppPalette.ink,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: controller.isLoading
-                          ? null
-                          : () {
-                              controller.refresh();
-                            },
-                      icon: controller.isLoading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2.2),
-                            )
-                          : const Icon(Icons.refresh_rounded),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white.withValues(alpha: 0.76),
+                      const SizedBox(height: 4),
+                      Text(
+                        summary,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppPalette.ink.withValues(alpha: 0.7),
+                          height: 1.35,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  summary,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: AppPalette.ink.withValues(alpha: 0.72),
-                    height: 1.38,
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                _PatientMenu(
+                IconButton(
+                  onPressed: controller.isLoading
+                      ? null
+                      : () {
+                          controller.refresh();
+                        },
+                  icon: controller.isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                        )
+                      : const Icon(Icons.refresh_rounded),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.8),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _ProfileButton(
                   patients: controller.patients,
                   selectedPatientId: controller.selectedPatientId,
                   patientMeta: patientMeta,
+                  isLoading: controller.isLoading,
+                  onRefresh: controller.refresh,
                   onSelected: (patientId) {
                     controller.selectPatient(patientId);
                   },
@@ -342,89 +336,213 @@ class _ShellTopBar extends StatelessWidget {
   }
 }
 
-class _PatientMenu extends StatelessWidget {
-  const _PatientMenu({
+class _ProfileButton extends StatelessWidget {
+  const _ProfileButton({
     required this.patients,
     required this.selectedPatientId,
     required this.patientMeta,
+    required this.isLoading,
+    required this.onRefresh,
     required this.onSelected,
   });
 
   final List<PatientListItem> patients;
   final String? selectedPatientId;
   final String patientMeta;
+  final bool isLoading;
+  final Future<void> Function() onRefresh;
   final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    final label =
-        selectedPatientId == null ? 'Select a profile' : 'Current profile';
+    return IconButton(
+      tooltip: 'Profile',
+      onPressed: () => showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) => _ProfileSheet(
+          patients: patients,
+          selectedPatientId: selectedPatientId,
+          patientMeta: patientMeta,
+          isLoading: isLoading,
+          onRefresh: onRefresh,
+          onSelected: onSelected,
+        ),
+      ),
+      icon: const Icon(Icons.person_outline_rounded),
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.white.withValues(alpha: 0.8),
+      ),
+    );
+  }
+}
 
-    return PopupMenuButton<String>(
-      onSelected: onSelected,
-      enabled: patients.isNotEmpty,
-      itemBuilder: (context) => [
-        for (final patient in patients)
-          PopupMenuItem<String>(
-            value: patient.patientId,
+class _ProfileSheet extends StatelessWidget {
+  const _ProfileSheet({
+    required this.patients,
+    required this.selectedPatientId,
+    required this.patientMeta,
+    required this.isLoading,
+    required this.onRefresh,
+    required this.onSelected,
+  });
+
+  final List<PatientListItem> patients;
+  final String? selectedPatientId;
+  final String patientMeta;
+  final bool isLoading;
+  final Future<void> Function() onRefresh;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF6F0E7),
+            borderRadius: BorderRadius.circular(32),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '${patient.age} • ${patient.country}',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Profile',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: AppPalette.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
                 Text(
-                  '${patient.patientId} • ${patient.primaryFocusArea}',
-                  style: Theme.of(context).textTheme.bodySmall,
+                  patientMeta,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppPalette.ink.withValues(alpha: 0.72),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Internal demo controls',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: AppPalette.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Patient switching lives here so the customer journey stays clean. Real customers would not see this panel.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppPalette.ink.withValues(alpha: 0.7),
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      for (var index = 0; index < patients.length; index++) ...[
+                        _PatientSheetRow(
+                          patient: patients[index],
+                          selected:
+                              patients[index].patientId == selectedPatientId,
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            onSelected(patients[index].patientId);
+                          },
+                        ),
+                        if (index < patients.length - 1)
+                          const Divider(height: 18),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: isLoading
+                      ? null
+                      : () {
+                          Navigator.of(context).pop();
+                          onRefresh();
+                        },
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Refresh current data'),
                 ),
               ],
             ),
           ),
-      ],
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.84),
-          borderRadius: BorderRadius.circular(24),
         ),
+      ),
+    );
+  }
+}
+
+class _PatientSheetRow extends StatelessWidget {
+  const _PatientSheetRow({
+    required this.patient,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final PatientListItem patient;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         child: Row(
           children: [
-            const Icon(
-              Icons.person_pin_circle_outlined,
-              color: AppPalette.ink,
-            ),
-            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    label,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: AppPalette.ink,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    patient.patientId,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: AppPalette.ink,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    patientMeta,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppPalette.ink.withValues(alpha: 0.62),
-                        ),
+                    '${patient.age} • ${patient.country} • ${patient.primaryFocusArea}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppPalette.ink.withValues(alpha: 0.68),
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: AppPalette.ink,
-            ),
+            if (selected)
+              const Icon(Icons.check_circle_rounded, color: AppPalette.forest),
           ],
         ),
       ),
@@ -520,9 +638,9 @@ class _NavButton extends StatelessWidget {
                   label,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: selected ? Colors.white : AppPalette.ink,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    color: selected ? Colors.white : AppPalette.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],

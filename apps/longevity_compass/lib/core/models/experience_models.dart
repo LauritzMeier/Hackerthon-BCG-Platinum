@@ -15,8 +15,9 @@ class PatientListItem {
       sex: _asString(json['sex']),
       country: _asString(json['country']),
       primaryFocusArea: _asString(json['primary_focus_area']),
-      estimatedBiologicalAge:
-          _asNullableDouble(json['estimated_biological_age']),
+      estimatedBiologicalAge: _asNullableDouble(
+        json['estimated_biological_age'],
+      ),
     );
   }
 
@@ -57,8 +58,9 @@ class ExperienceSnapshot {
       journeyStart: JourneyStart.fromJson(_asMap(json['journey_start'])),
       careContext: CareContext.fromJson(_asMap(json['care_context'])),
       dataCoverage: DataCoverage.fromJson(_asMap(json['data_coverage'])),
-      progressSummary:
-          ProgressSummary.fromJson(_asMap(json['progress_summary'])),
+      progressSummary: ProgressSummary.fromJson(
+        _asMap(json['progress_summary']),
+      ),
       alerts: AlertSummary.fromJson(_asMap(json['alerts'])),
       offers: OfferSummary.fromJson(_asMap(json['offers'])),
     );
@@ -181,8 +183,9 @@ class ProfileSummary {
       age: _asInt(json['age']),
       sex: _asString(json['sex']),
       country: _asString(json['country']),
-      estimatedBiologicalAge:
-          _asNullableDouble(json['estimated_biological_age']),
+      estimatedBiologicalAge: _asNullableDouble(
+        json['estimated_biological_age'],
+      ),
       ageGapYears: _asNullableDouble(json['age_gap_years']),
     );
   }
@@ -210,8 +213,9 @@ class CompassSnapshot {
     return CompassSnapshot(
       overallDirection: _asString(json['overall_direction']),
       chronologicalAge: _asInt(json['chronological_age']),
-      estimatedBiologicalAge:
-          _asNullableDouble(json['estimated_biological_age']),
+      estimatedBiologicalAge: _asNullableDouble(
+        json['estimated_biological_age'],
+      ),
       primaryFocus: PrimaryFocus.fromJson(_asMap(json['primary_focus'])),
       pillars: _asObjectList(json['pillars'], PillarSnapshot.fromJson),
       peerComparison: PeerComparisonSnapshot.fromJson(
@@ -245,8 +249,9 @@ class PeerComparisonSnapshot {
       headline: _asString(json['headline']),
       cohortLabel: _asString(json['cohort_label']),
       sampleSize: _asInt(json['sample_size']),
-      strongestRelativePillarId:
-          _asString(json['strongest_relative_pillar_id']),
+      strongestRelativePillarId: _asString(
+        json['strongest_relative_pillar_id'],
+      ),
       biggestGapPillarId: _asString(json['biggest_gap_pillar_id']),
       items: _asObjectList(json['items'], PeerComparisonItem.fromJson),
     );
@@ -396,10 +401,7 @@ class WeeklyPlan {
 }
 
 class PlanAction {
-  PlanAction({
-    required this.title,
-    required this.description,
-  });
+  PlanAction({required this.title, required this.description});
 
   factory PlanAction.fromJson(Map<String, dynamic> json) {
     return PlanAction(
@@ -443,8 +445,10 @@ class ProgressSummary {
     return ProgressSummary(
       latestReadingDate: _asDateTime(json['latest_reading_date']),
       latestSnapshot: LatestSnapshot.fromJson(_asMap(json['latest_snapshot'])),
-      headlineTrends:
-          _asObjectList(json['headline_trends'], HeadlineTrend.fromJson),
+      headlineTrends: _asObjectList(
+        json['headline_trends'],
+        HeadlineTrend.fromJson,
+      ),
     );
   }
 
@@ -558,10 +562,7 @@ class RiskFlag {
 }
 
 class OfferSummary {
-  OfferSummary({
-    required this.recommended,
-    required this.additionalItems,
-  });
+  OfferSummary({required this.recommended, required this.additionalItems});
 
   factory OfferSummary.fromJson(Map<String, dynamic> json) {
     final recommendedRaw = json['recommended'];
@@ -569,8 +570,10 @@ class OfferSummary {
       recommended: recommendedRaw is Map<String, dynamic>
           ? OfferOpportunity.fromJson(recommendedRaw)
           : null,
-      additionalItems:
-          _asObjectList(json['additional_items'], OfferOpportunity.fromJson),
+      additionalItems: _asObjectList(
+        json['additional_items'],
+        OfferOpportunity.fromJson,
+      ),
     );
   }
 
@@ -585,6 +588,8 @@ class OfferOpportunity {
     required this.rationale,
     required this.priority,
     required this.category,
+    required this.offerType,
+    required this.deliveryModel,
     required this.summary,
     required this.whyNow,
     required this.includes,
@@ -595,6 +600,7 @@ class OfferOpportunity {
     required this.firstWeek,
     required this.caution,
     required this.personalizationNote,
+    required this.ctaLabel,
   });
 
   factory OfferOpportunity.fromJson(Map<String, dynamic> json) {
@@ -604,6 +610,8 @@ class OfferOpportunity {
       rationale: _asString(json['rationale']),
       priority: _asInt(json['priority']),
       category: _asString(json['category']),
+      offerType: _asString(json['offer_type']),
+      deliveryModel: _asString(json['delivery_model']),
       summary: _asString(json['summary']),
       whyNow: _asString(json['why_now']),
       includes: _asStringList(json['includes']),
@@ -614,6 +622,7 @@ class OfferOpportunity {
       firstWeek: _asStringList(json['first_week']),
       caution: _asString(json['caution']),
       personalizationNote: _asString(json['personalization_note']),
+      ctaLabel: _asString(json['cta_label']),
     );
   }
 
@@ -622,6 +631,8 @@ class OfferOpportunity {
   final String rationale;
   final int priority;
   final String category;
+  final String offerType;
+  final String deliveryModel;
   final String summary;
   final String whyNow;
   final List<String> includes;
@@ -632,13 +643,34 @@ class OfferOpportunity {
   final List<String> firstWeek;
   final String caution;
   final String personalizationNote;
+  final String ctaLabel;
+
+  String get primaryActionLabel {
+    if (ctaLabel.isNotEmpty) {
+      return ctaLabel;
+    }
+
+    switch (offerType) {
+      case 'appointment':
+      case 'appointment_prep':
+        return 'Book visit';
+      case 'diagnostic':
+        return 'Book test';
+      case 'program':
+      case 'coaching':
+        return 'Start plan';
+      case 'supplement':
+        return 'Book review';
+      case 'starter':
+        return 'Start now';
+      default:
+        return 'See next step';
+    }
+  }
 }
 
 class CoachReply {
-  CoachReply({
-    required this.reply,
-    required this.primaryFocus,
-  });
+  CoachReply({required this.reply, required this.primaryFocus});
 
   factory CoachReply.fromJson(Map<String, dynamic> json) {
     return CoachReply(
@@ -652,10 +684,7 @@ class CoachReply {
 }
 
 class ChatMessage {
-  ChatMessage({
-    required this.role,
-    required this.text,
-  });
+  ChatMessage({required this.role, required this.text});
 
   factory ChatMessage.assistant(String text) {
     return ChatMessage(role: 'assistant', text: text);

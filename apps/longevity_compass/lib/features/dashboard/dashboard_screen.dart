@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../app/app_theme.dart';
-import '../../core/models/experience_models.dart';
 import '../../widgets/compass_components.dart';
 import 'dashboard_controller.dart';
 
@@ -37,20 +36,11 @@ class DashboardScreen extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(24),
             children: [
-              ScreenHeader(
+              const ScreenHeader(
                 eyebrow: 'Today',
                 title: 'Keep this week simple.',
                 subtitle:
-                    'See where you stand, the one goal for this week, and what would make the plan more personal.',
-                trailing: _PatientPicker(
-                  patients: controller.patients,
-                  selectedPatientId: controller.selectedPatientId,
-                  onChanged: (value) {
-                    if (value != null) {
-                      controller.selectPatient(value);
-                    }
-                  },
-                ),
+                    'See where you stand, the one goal for this week, and the few signals that matter most.',
               ),
               const SizedBox(height: 24),
               if (experience.compass.peerComparison.hasItems) ...[
@@ -102,7 +92,7 @@ class DashboardScreen extends StatelessWidget {
               SectionSurface(
                 title: 'What informs the plan',
                 subtitle:
-                    'We use your doctor context and your connected signals, and we are explicit about what is still missing.',
+                    'Doctor context, watch data, and one clear next input keep this grounded.',
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final stacked = constraints.maxWidth < 900;
@@ -175,9 +165,8 @@ class DashboardScreen extends StatelessWidget {
                           .toList(growable: false);
                       final children = trends
                           .map(
-                            (trend) => Expanded(
-                              child: MetricTrendTile(trend: trend),
-                            ),
+                            (trend) =>
+                                Expanded(child: MetricTrendTile(trend: trend)),
                           )
                           .toList(growable: false);
 
@@ -276,17 +265,11 @@ class _DashboardDetailCard extends StatelessWidget {
           ),
           if (tagsTitle != null && tags.isNotEmpty) ...[
             const SizedBox(height: 16),
-            _InfoTagWrap(
-              title: tagsTitle!,
-              items: tags,
-            ),
+            _InfoTagWrap(title: tagsTitle!, items: tags),
           ],
           if (listTitle != null && listItems.isNotEmpty) ...[
             const SizedBox(height: 16),
-            _BulletList(
-              title: listTitle!,
-              items: listItems,
-            ),
+            _BulletList(title: listTitle!, items: listItems),
           ],
           if (footer != null && footer!.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -314,10 +297,7 @@ class _DashboardDetailCard extends StatelessWidget {
 }
 
 class _InfoTagWrap extends StatelessWidget {
-  const _InfoTagWrap({
-    required this.title,
-    required this.items,
-  });
+  const _InfoTagWrap({required this.title, required this.items});
 
   final String title;
   final List<String> items;
@@ -360,10 +340,7 @@ class _InfoTagWrap extends StatelessWidget {
 }
 
 class _BulletList extends StatelessWidget {
-  const _BulletList({
-    required this.title,
-    required this.items,
-  });
+  const _BulletList({required this.title, required this.items});
 
   final String title;
   final List<String> items;
@@ -387,11 +364,7 @@ class _BulletList extends StatelessWidget {
             children: [
               const Padding(
                 padding: EdgeInsets.only(top: 6),
-                child: Icon(
-                  Icons.circle,
-                  size: 8,
-                  color: AppPalette.forest,
-                ),
+                child: Icon(Icons.circle, size: 8, color: AppPalette.forest),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -408,44 +381,6 @@ class _BulletList extends StatelessWidget {
           if (index < items.length - 1) const SizedBox(height: 10),
         ],
       ],
-    );
-  }
-}
-
-class _PatientPicker extends StatelessWidget {
-  const _PatientPicker({
-    required this.patients,
-    required this.selectedPatientId,
-    required this.onChanged,
-  });
-
-  final List<PatientListItem> patients;
-  final String? selectedPatientId;
-  final ValueChanged<String?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 240,
-      child: DropdownButtonFormField<String>(
-        initialValue: selectedPatientId,
-        isExpanded: true,
-        decoration: const InputDecoration(
-          labelText: 'Patient',
-        ),
-        items: patients
-            .map(
-              (patient) => DropdownMenuItem<String>(
-                value: patient.patientId,
-                child: Text(
-                  patient.displayLabel,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            )
-            .toList(growable: false),
-        onChanged: onChanged,
-      ),
     );
   }
 }
