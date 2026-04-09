@@ -3,24 +3,25 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import asdict, dataclass
 import json
 import logging
 import os
+from pathlib import Path
 import re
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from .coach_voice import (
+    compose_dynamic_sections,
     compose_general_sections,
     compose_offer_booking_sections,
     compose_offer_recommendation_sections,
-    compose_pillar_sections,
-    compose_priority_sections,
-    compose_tailored_sections,
     firebase_context_line,
     safety_footers,
 )
@@ -31,7 +32,6 @@ from .firebase_client import (
     get_runtime_diagnostics,
     save_agent_offer_state,
 )
-from .main import analyze_six_pillars, build_tailored_explanation, explain_pillar
 from .offer_actions import (
     booking_confirmation_detected,
     build_offer_slots,
@@ -40,6 +40,13 @@ from .offer_actions import (
     offer_request_detected,
     select_matching_offer,
 )
+from .pillar_analysis import analyze_patient_six_pillars, generate_tailored_explanation
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(ROOT_DIR / ".env.local")
+load_dotenv()
+
+analyze_six_pillars = analyze_patient_six_pillars
 
 app = FastAPI(
     title="Longevity ADK Agent Server",
@@ -76,10 +83,26 @@ def _chat_debug_enabled(request: Optional[ChatRequest] = None) -> bool:
     return bool(request and request.include_debug) or _flag_enabled("AGENT_DEBUG", "AGENT_DEBUG_CHAT")
 
 
+@dataclass
+class RequestProfile:
+    normalized_message: str
+    target_pillars: List[str]
+    priority_intent: Optional[str] = None
+    comparison_requested: bool = False
+    action_requested: bool = False
+    explanation_requested: bool = False
+    trend_requested: bool = False
+    reassurance_requested: bool = False
+    summary_requested: bool = False
+    detail_requested: bool = False
+    concise_requested: bool = False
+    greeting: bool = False
+
+
 PILLAR_KEYWORDS = {
     "sleep_recovery": ["sleep", "recovery"],
     "cardiovascular_health": ["cardio", "heart", "blood pressure", "cardiovascular", "hrv", "resting hr"],
-    "metabolic_health": ["metabolic", "glucose", "hba1c", "cholesterol", "lipid", "insulin"],
+    "metabolic_health": ["metabolic", "metabolism", "glucose", "hba1c", "cholesterol", "lipid", "insulin"],
     "movement_fitness": ["movement", "fitness", "steps", "activity", "exercise", "active minutes"],
     "nutrition_quality": ["nutrition", "diet", "food", "alcohol", "hydration", "water"],
     "mental_resilience": ["mental", "stress", "wellbeing", "resilience", "mood"],
@@ -166,17 +189,138 @@ PRIORITY_INTENT_KEYWORDS = {
     ],
 }
 
+COMPARISON_KEYWORDS = [
+    "compare",
+    "comparison",
+    "versus",
+    "vs",
+    "better than",
+    "worse than",
+    "difference",
+    "stack up",
+    "relative to",
+]
+
+ACTION_KEYWORDS = [
+    "what should i do",
+    "what do i do",
+    "next step",
+    "next best action",
+    "how do i improve",
+    "how can i improve",
+    "how should i improve",
+    "what should i work on",
+    "what do you suggest",
+    "plan",
+    "action",
+    "habit",
+    "fix",
+    "improve",
+    "change",
+    "do next",
+]
+
+EXPLANATION_KEYWORDS = [
+    "why",
+    "explain",
+    "what does",
+    "what is driving",
+    "what's driving",
+    "help me understand",
+    "break down",
+    "walk me through",
+    "what does this mean",
+]
+
+TREND_KEYWORDS = [
+    "trend",
+    "trajectory",
+    "direction",
+    "improving",
+    "getting worse",
+    "slipping",
+    "drifting",
+    "changing",
+    "change over time",
+]
+
+REASSURANCE_KEYWORDS = [
+    "should i worry",
+    "worry",
+    "serious",
+    "bad",
+    "dangerous",
+    "okay",
+    "normal",
+    "concerned",
+    "afraid",
+    "scared",
+]
+
+SUMMARY_KEYWORDS = [
+    "overall",
+    "big picture",
+    "summary",
+    "how am i doing",
+    "where do i stand",
+    "across the board",
+    "everything",
+]
+
+DETAIL_KEYWORDS = [
+    "in detail",
+    "deep dive",
+    "detailed",
+    "more detail",
+    "specifics",
+    "evidence",
+    "data points",
+    "walk me through",
+    "break it down",
+]
+
+CONCISE_KEYWORDS = [
+    "brief",
+    "quick",
+    "short",
+    "just tell me",
+    "in one line",
+    "in one sentence",
+    "tldr",
+]
+
+GREETING_KEYWORDS = {
+    "hi",
+    "hello",
+    "hey",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "thanks",
+    "thank you",
+}
+
 
 def _normalized_text(message: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", message.lower())).strip()
 
 
-def _extract_target_pillar(message: str) -> Optional[str]:
+def _contains_any_phrase(message: str, phrases: List[str]) -> bool:
+    return any(phrase in message for phrase in phrases)
+
+
+def _extract_target_pillars(message: str) -> List[str]:
     lower_message = _normalized_text(message)
+    matches: List[str] = []
     for pillar_id, words in PILLAR_KEYWORDS.items():
         if any(word in lower_message for word in words):
-            return pillar_id
-    return None
+            matches.append(pillar_id)
+    return matches
+
+
+def _extract_target_pillar(message: str) -> Optional[str]:
+    pillars = _extract_target_pillars(message)
+    return pillars[0] if pillars else None
 
 
 def _is_pillar_related(message: str) -> bool:
@@ -213,7 +357,7 @@ def _is_pillar_related(message: str) -> bool:
         "measurable",
         "roi",
     ]
-    return any(token in lower_message for token in generic_signals) or _extract_target_pillar(message) is not None
+    return any(token in lower_message for token in generic_signals) or bool(_extract_target_pillars(message))
 
 
 def _extract_priority_intent(message: str) -> Optional[str]:
@@ -224,37 +368,36 @@ def _extract_priority_intent(message: str) -> Optional[str]:
     return None
 
 
-def _sorted_pillars_by_priority(analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
-    return sorted(
-        analysis["pillars"],
-        key=lambda pillar: (pillar["score"], 0 if pillar["trend"] == "drifting" else 1),
+def _parse_request_profile(message: str) -> RequestProfile:
+    normalized_message = _normalized_text(message)
+    target_pillars = _extract_target_pillars(message)
+    priority_intent = _extract_priority_intent(message)
+    comparison_requested = _contains_any_phrase(normalized_message, COMPARISON_KEYWORDS) or len(target_pillars) >= 2
+    action_requested = _contains_any_phrase(normalized_message, ACTION_KEYWORDS)
+    explanation_requested = _contains_any_phrase(normalized_message, EXPLANATION_KEYWORDS)
+    trend_requested = _contains_any_phrase(normalized_message, TREND_KEYWORDS)
+    reassurance_requested = _contains_any_phrase(normalized_message, REASSURANCE_KEYWORDS)
+    summary_requested = _contains_any_phrase(normalized_message, SUMMARY_KEYWORDS)
+    detail_requested = _contains_any_phrase(normalized_message, DETAIL_KEYWORDS)
+    concise_requested = _contains_any_phrase(normalized_message, CONCISE_KEYWORDS)
+    greeting = normalized_message in GREETING_KEYWORDS
+    if target_pillars and explanation_requested and priority_intent == "priority":
+        priority_intent = None
+
+    return RequestProfile(
+        normalized_message=normalized_message,
+        target_pillars=target_pillars,
+        priority_intent=priority_intent,
+        comparison_requested=comparison_requested,
+        action_requested=action_requested,
+        explanation_requested=explanation_requested,
+        trend_requested=trend_requested,
+        reassurance_requested=reassurance_requested,
+        summary_requested=summary_requested,
+        detail_requested=detail_requested,
+        concise_requested=concise_requested,
+        greeting=greeting,
     )
-
-
-def _compose_priority_answer(message: str, analysis: Dict[str, Any]) -> List[str]:
-    if not analysis.get("ok"):
-        return [
-            "I couldn't pull enough structured data for this patient id yet — double-check the id and that records synced.",
-            "Until the warehouse loads, I can't personalize this; treat anything generic as placeholder.",
-        ]
-
-    ranked = _sorted_pillars_by_priority(analysis)
-    weakest = ranked[0]
-    next_weakest = ranked[1] if len(ranked) > 1 else ranked[0]
-    strongest = max(analysis["pillars"], key=lambda pillar: pillar["score"])
-    intent = _extract_priority_intent(message) or "priority"
-    persona_context = analysis.get("persona_context")
-
-    sections = compose_priority_sections(
-        intent,
-        weakest,
-        strongest,
-        next_weakest,
-        persona_context=persona_context,
-    )
-    sections.append(firebase_context_line(analysis["firebase_context_summary"]))
-    sections.extend(safety_footers())
-    return sections
 
 
 def _find_booked_offer(offer_context: Dict[str, Any], offer_code: str | None) -> Optional[Dict[str, Any]]:
@@ -500,25 +643,54 @@ def _build_offer_response(
     return None
 
 
-def _compose_from_tailored(payload: Dict) -> List[str]:
-    return compose_tailored_sections(payload)
-
-
-def _compose_general_chat(message: str, patient_id: str) -> List[str]:
-    analysis = build_tailored_explanation(patient_id)
+def _build_dynamic_evidence_index(
+    analysis: Dict[str, Any],
+    request_profile: RequestProfile,
+) -> Dict[str, Any] | List[Dict[str, Any]]:
     if not analysis.get("ok"):
-        return [
-            "I couldn't load a full picture for that patient id — worth verifying the id and data pipeline.",
-            "Once records are in, I can answer in a much more personal tone.",
-        ]
+        return {}
+    target_pillars = request_profile.target_pillars
+    if len(target_pillars) == 1:
+        for pillar in analysis.get("pillars", []):
+            if pillar["id"] == target_pillars[0]:
+                return {pillar["id"]: pillar}
+    return analysis.get("pillars", [])
 
-    focus = analysis["claims"][0]["evidence"][0]
-    return compose_general_sections(
-        message,
-        patient_id,
-        focus,
-        persona_context=analysis.get("persona_context"),
-    )
+
+def _compose_dynamic_chat(
+    message: str,
+    patient_id: str,
+    analysis: Dict[str, Any],
+    request_profile: RequestProfile,
+) -> Dict[str, Any]:
+    tailored = generate_tailored_explanation(patient_id, analysis=analysis)
+    if not tailored.get("ok"):
+        tailored = None
+
+    if request_profile.greeting and not _is_pillar_related(message):
+        focus = ((tailored or {}).get("claims") or [{}])[0].get("evidence", [{}])[0]
+        sections = compose_general_sections(
+            message,
+            patient_id,
+            focus,
+            persona_context=analysis.get("persona_context"),
+        )
+    else:
+        sections = compose_dynamic_sections(
+            message,
+            analysis,
+            tailored=tailored,
+            request_profile=asdict(request_profile),
+        )
+
+    return {
+        "sections": sections,
+        "evidence_index": _build_dynamic_evidence_index(analysis, request_profile),
+        "source_payload": {
+            **analysis,
+            "request_profile": asdict(request_profile),
+        },
+    }
 
 
 def _extract_debug_payload(source_payload: Dict[str, Any], request: ChatRequest) -> Dict[str, Any]:
@@ -533,6 +705,8 @@ def _extract_debug_payload(source_payload: Dict[str, Any], request: ChatRequest)
         "firebase_context_summary": source_payload.get("firebase_context_summary")
         or (source_payload.get("context") or {}).get("firebase_context_summary"),
     }
+    if source_payload.get("request_profile"):
+        payload["request_profile"] = source_payload["request_profile"]
     if firebase_context:
         normalized = firebase_context.get("normalized") or {}
         payload["firebase"] = {
@@ -583,9 +757,18 @@ def _extract_debug_payload(source_payload: Dict[str, Any], request: ChatRequest)
 
 def _build_debug_section(debug_payload: Dict[str, Any]) -> Optional[str]:
     firebase = debug_payload.get("firebase") or {}
+    request_profile = debug_payload.get("request_profile") or {}
     if not firebase:
-        return None
+        if not request_profile:
+            return None
+        firebase = {}
     parts = []
+    if request_profile.get("priority_intent"):
+        parts.append(f"intent={request_profile['priority_intent']}")
+    if request_profile.get("target_pillars"):
+        parts.append(f"targets={','.join(request_profile['target_pillars'])}")
+    if request_profile.get("comparison_requested"):
+        parts.append("comparison=true")
     if firebase.get("lookup_status"):
         parts.append(f"lookup_status={firebase['lookup_status']}")
     if firebase.get("failure_stage"):
@@ -629,38 +812,17 @@ def _build_chat_sections(request: ChatRequest) -> Dict[str, object]:
                 "booking": offer_payload.get("booking"),
             }
 
-    priority_intent = _extract_priority_intent(message)
-    if priority_intent and _extract_target_pillar(message) is None:
-        analysis = analyze_six_pillars(patient_id)
-        source_payload = analysis
-        sections = _compose_priority_answer(message, analysis)
-        evidence_index = analysis.get("pillars", []) if analysis.get("ok") else {}
-    elif _is_pillar_related(message):
-        target_pillar = _extract_target_pillar(message)
-        if target_pillar:
-            pillar_payload = explain_pillar(patient_id, target_pillar)
-            if not pillar_payload.get("ok"):
-                raise HTTPException(status_code=404, detail=pillar_payload.get("error", "analysis failed"))
-            pillar = pillar_payload["pillar"]
-            source_payload = pillar_payload
-            sections = compose_pillar_sections(
-                pillar,
-                pillar_payload["firebase_context_summary"],
-                persona_context=pillar_payload.get("persona_context"),
-            )
-            evidence_index = {pillar["id"]: pillar}
-        else:
-            tailored = build_tailored_explanation(patient_id)
-            if not tailored.get("ok"):
-                raise HTTPException(status_code=404, detail=tailored.get("error", "analysis failed"))
-            source_payload = tailored
-            sections = _compose_from_tailored(tailored)
-            evidence_index = tailored.get("evidence_index", {})
-    else:
-        sections = _compose_general_chat(message, patient_id)
-        analysis = analyze_six_pillars(patient_id)
-        source_payload = analysis
-        evidence_index = analysis.get("pillars", []) if analysis.get("ok") else {}
+    request_profile = _parse_request_profile(message)
+    analysis = analyze_six_pillars(patient_id)
+    dynamic_payload = _compose_dynamic_chat(
+        message,
+        patient_id,
+        analysis,
+        request_profile,
+    )
+    source_payload = dynamic_payload["source_payload"]
+    sections = dynamic_payload["sections"]
+    evidence_index = dynamic_payload["evidence_index"]
 
     debug_payload = _extract_debug_payload(source_payload, request) if _chat_debug_enabled(request) else None
     if debug_payload:

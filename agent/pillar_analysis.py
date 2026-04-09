@@ -414,9 +414,13 @@ def analyze_patient_six_pillars(
     return response
 
 
-def explain_single_pillar(patient_id: str, pillar_id: str) -> Dict[str, Any]:
+def explain_single_pillar(
+    patient_id: str,
+    pillar_id: str,
+    analysis: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Return a focused explanation for one requested pillar."""
-    analysis = analyze_patient_six_pillars(patient_id)
+    analysis = analysis or analyze_patient_six_pillars(patient_id)
     if not analysis.get("ok"):
         return analysis
 
@@ -446,14 +450,17 @@ def explain_single_pillar(patient_id: str, pillar_id: str) -> Dict[str, Any]:
     }
 
 
-def generate_tailored_explanation(patient_id: str) -> Dict[str, Any]:
+def generate_tailored_explanation(
+    patient_id: str,
+    analysis: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Generate evidence-based, personalized coaching explanation content.
 
     This function returns structured narrative components that the ADK model can
     turn into natural language while preserving explicit evidence citations and
     safety boundaries.
     """
-    analysis = analyze_patient_six_pillars(patient_id)
+    analysis = analysis or analyze_patient_six_pillars(patient_id)
     if not analysis.get("ok"):
         return analysis
 
