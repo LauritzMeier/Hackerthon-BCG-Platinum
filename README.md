@@ -1,10 +1,12 @@
 # Hackerthon-BCG-Platinum
 
-Local-first data foundation for the BCG Platinion longevity MVP challenge.
+Google-first longevity MVP direction with a fast local data prototyping foundation.
 
 ## What We Optimized For
 
 - A slightly cleaner foundation that we can keep building after the hackathon
+- Google-first target deployment with lightweight local iteration
+- Flutter + Firebase + Cloud Run + Vertex AI as the chosen MVP stack
 - A patient-facing journey only
 - Fast access to the challenge CSVs through one local warehouse and one thin API layer
 
@@ -16,8 +18,9 @@ data/
   warehouse/      # local DuckDB database
   exports/        # optional demo exports
 docs/
-  challenge-summary.md
-  personas.md
+  README.md
+  product/
+  architecture/
   adr/
 scripts/
   build_warehouse.py
@@ -43,7 +46,8 @@ src/
    - `curated.risk_flags`
    - `curated.offer_opportunities`
    - `curated.coach_context`
-4. Use the warehouse directly for analysis and a thin FastAPI app for the MVP frontend.
+4. Use the warehouse directly for local analysis and payload design.
+5. Treat Google Cloud as the target deployment architecture for mobile, web, and chatbot delivery.
 
 ## Quick Start
 
@@ -85,7 +89,12 @@ uvicorn longevity_mvp.api:app --reload --app-dir src
 ## Notes
 
 - The scaffold was validated locally with a `.venv` created in the repo root.
-- The challenge brief summary and remaining product questions live in [docs/challenge-summary.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/challenge-summary.md).
-- The persona portfolio lives in [docs/personas.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/personas.md).
+- The documentation index lives in [docs/README.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/README.md).
+- The product brief lives in [docs/product/brief.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/brief.md).
+- The persona portfolio lives in [docs/product/personas.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/personas.md).
+- The recurring user journeys live in [docs/product/journeys.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/journeys.md).
+- The Longevity Compass concept lives in [docs/product/longevity-compass.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/longevity-compass.md).
+- The Google-first target architecture lives in [docs/architecture/google-first-mvp.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/architecture/google-first-mvp.md).
+- The chosen MVP stack is Flutter + Firebase + Cloud Run + Vertex AI, with Lovable available as an optional prototyping accelerator.
 - The contributor operating guide lives in [AGENT.MD](/Users/lauritz/git/Hackerthon-BCG-Platinum/AGENT.MD).
 - Architectural decisions live in [docs/adr/README.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/README.md).

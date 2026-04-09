@@ -20,8 +20,10 @@ Establish `AGENT.MD` as the operational guide for contributors.
 
 Define named specialist subagent roles for:
 
+- documentation curation
 - persona strategy
 - journey design
+- commercial strategy
 - data architecture
 - backend delivery
 - coach safety review
