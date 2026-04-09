@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../mock/mock_shell.dart';
 import 'app_theme.dart';
+import 'compass_shell.dart';
+import '../mock/mock_shell.dart';
 
 class LongevityCompassApp extends StatelessWidget {
   const LongevityCompassApp({super.key});
@@ -12,7 +13,10 @@ class LongevityCompassApp extends StatelessWidget {
       title: 'Longevity Compass',
       theme: AppTheme.build(),
       debugShowCheckedModeBanner: false,
-      home: const MockCompassShell(),
+      home: const CompassShell(),
+      routes: {
+        '/mock': (_) => const MockCompassShell(),
+      },
     );
   }
 }

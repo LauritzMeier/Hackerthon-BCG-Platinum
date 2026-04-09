@@ -8,9 +8,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=8080
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
 COPY agent/requirements.txt ./agent-requirements.txt
-RUN pip install --no-cache-dir -r agent-requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt -r agent-requirements.txt
 
 COPY src ./src
 COPY agent ./agent

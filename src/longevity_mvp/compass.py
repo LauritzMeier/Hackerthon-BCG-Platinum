@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional
 
+from .journey_context import build_care_context, build_data_coverage
+
 
 PILLAR_DISPLAY_ORDER = [
     "sleep_recovery",
@@ -23,6 +25,12 @@ def _to_float(value) -> float:
 
 def _round(value: float, digits: int = 1) -> float:
     return round(float(value), digits)
+
+
+def _average(values: List[float]) -> float:
+    if not values:
+        return 0.0
+    return sum(values) / len(values)
 
 
 def _score_to_state(score: float) -> str:
@@ -258,6 +266,76 @@ def _choose_primary_focus(pillars: List[Dict]) -> Dict:
     }
 
 
+def _build_peer_comparison(profile: Dict, pillars: List[Dict], age_peers: List[Dict]) -> Dict:
+    if not age_peers:
+        return {
+            "headline": "How your six pillars compare with your age cohort",
+            "cohort_label": "Peer comparison not available yet",
+            "sample_size": 0,
+            "strongest_relative_pillar_id": "",
+            "biggest_gap_pillar_id": "",
+            "items": [],
+        }
+
+    peer_pillars = [_build_pillars(peer_profile) for peer_profile in age_peers]
+    peer_ages = [
+        int(_to_float(peer_profile.get("age")))
+        for peer_profile in age_peers
+        if peer_profile.get("age") is not None
+    ]
+
+    items = []
+    for pillar in pillars:
+        peer_scores = []
+        for peer_set in peer_pillars:
+            peer_pillar = _pillar_by_id(peer_set, pillar["id"])
+            if peer_pillar is not None:
+                peer_scores.append(_to_float(peer_pillar["score"]))
+
+        if not peer_scores:
+            continue
+
+        peer_score = _round(_average(peer_scores))
+        items.append(
+            {
+                "pillar_id": pillar["id"],
+                "pillar_name": pillar["name"],
+                "patient_score": _round(_to_float(pillar["score"])),
+                "peer_score": peer_score,
+                "difference": _round(_to_float(pillar["score"]) - peer_score),
+            }
+        )
+
+    if not items:
+        return {
+            "headline": "How your six pillars compare with your age cohort",
+            "cohort_label": "Peer comparison not available yet",
+            "sample_size": 0,
+            "strongest_relative_pillar_id": "",
+            "biggest_gap_pillar_id": "",
+            "items": [],
+        }
+
+    strongest_relative = max(items, key=lambda item: item["difference"])
+    biggest_gap = min(items, key=lambda item: item["difference"])
+    if peer_ages:
+        min_age = min(peer_ages)
+        max_age = max(peer_ages)
+    else:
+        current_age = int(_to_float(profile.get("age")))
+        min_age = current_age
+        max_age = current_age
+
+    return {
+        "headline": "How your six pillars compare with your age cohort",
+        "cohort_label": f"Compared with {len(age_peers)} people aged {min_age}-{max_age}",
+        "sample_size": len(age_peers),
+        "strongest_relative_pillar_id": strongest_relative["pillar_id"],
+        "biggest_gap_pillar_id": biggest_gap["pillar_id"],
+        "items": items,
+    }
+
+
 def _weekly_actions_for_pillar(pillar_id: str, profile: Dict) -> List[Dict]:
     action_map = {
         "sleep_recovery": [
@@ -367,6 +445,11 @@ def _recommended_offer(primary_focus: Dict, offers: List[Dict]) -> Optional[Dict
 def build_compass(bundle: Dict) -> Dict:
     profile = bundle["profile"]
     pillars = _build_pillars(profile)
+    peer_comparison = _build_peer_comparison(
+        profile,
+        pillars,
+        bundle.get("age_peers", []),
+    )
     overall_direction = _overall_direction(pillars)
     primary_focus = _choose_primary_focus(pillars)
     recommended_offer = _recommended_offer(primary_focus, bundle.get("offers", []))
@@ -379,6 +462,7 @@ def build_compass(bundle: Dict) -> Dict:
             "overall_direction": overall_direction,
             "primary_focus": primary_focus,
             "pillars": pillars,
+            "peer_comparison": peer_comparison,
             "summary": {
                 "current_state": "Six-pillar longevity snapshot",
                 "trajectory": overall_direction,
@@ -413,19 +497,23 @@ def build_weekly_plan(bundle: Dict) -> Dict:
 def build_coach_snapshot(bundle: Dict) -> Dict:
     compass = build_compass(bundle)
     focus = compass["primary_focus"]["pillar_name"]
+    care_context = build_care_context(bundle, compass["primary_focus"])
+    data_coverage = build_data_coverage(bundle, compass["primary_focus"])
     return _normalize(
         {
             "patient_id": bundle["profile"]["patient_id"],
             "coach_name": "Ava",
             "intro": (
-                f"I am your longevity coach. Right now, {focus} is the most important area "
-                "to improve if you want to shift your trajectory."
+                f"I already have your watch trends and your doctor context on file. "
+                f"Right now, {focus} is the most important area to work on first. "
+                f"{care_context['last_appointment_summary']} "
+                f"{data_coverage['tailoring_note']}"
             ),
             "suggested_prompts": [
-                "Explain my compass in simple terms.",
-                "What should I do this week?",
-                "Why is my trajectory drifting or mixed?",
-                "Which support option is most relevant now?",
+                "Summarize what you already know about me.",
+                "What from my last doctor visit matters most now?",
+                "I recently had a heart event. What should I focus on first?",
+                "How should I start tracking meals so advice gets more personal?",
             ],
         }
     )
@@ -435,11 +523,14 @@ def build_coach_reply(bundle: Dict, message: str) -> Dict:
     compass = build_compass(bundle)
     plan = build_weekly_plan(bundle)
     focus = compass["primary_focus"]
+    care_context = build_care_context(bundle, focus)
+    data_coverage = build_data_coverage(bundle, focus)
     lower_message = message.lower()
 
     reply = (
         f"Your compass currently points most strongly toward {focus['pillar_name']}. "
         f"{focus['why_now']} "
+        f"{data_coverage['tailoring_note']} "
         "A good next step is to follow this week's action plan and then reassess your trajectory."
     )
 
@@ -447,6 +538,24 @@ def build_coach_reply(bundle: Dict, message: str) -> Dict:
         reply = (
             "Your sleep and recovery pillar explains how well you are resting and bouncing back. "
             "Improving sleep consistency and recovery quality is often the fastest way to improve weekly momentum."
+        )
+    elif "doctor" in lower_message or "appointment" in lower_message or "visit" in lower_message:
+        reply = (
+            f"{care_context['last_appointment_summary']} "
+            "That context should shape the next step, so the app should support your follow-up rather than act like it is starting from zero."
+        )
+    elif "heart attack" in lower_message or "heart event" in lower_message:
+        reply = (
+            "If you are recovering from a recent heart attack or other serious heart event, "
+            "the app should reinforce your clinician's recovery plan, medication instructions, and rehab guidance rather than replace them. "
+            f"Within that guardrail, the most helpful use of the app is to support {focus['pillar_name'].lower()}, "
+            "keep watch-based recovery visible, and turn your next appointment into a clearer plan."
+        )
+    elif "meal" in lower_message or "food" in lower_message or "nutrition" in lower_message or "track" in lower_message:
+        reply = (
+            f"{data_coverage['tailoring_note']} "
+            "The easiest way to improve this is to log one meal a day for the next 7 days. "
+            "That is enough to move nutrition support from generic advice toward something that actually fits your routine."
         )
     elif "offer" in lower_message or "package" in lower_message or "diagnostic" in lower_message:
         offer = compass["summary"]["recommended_offer"]

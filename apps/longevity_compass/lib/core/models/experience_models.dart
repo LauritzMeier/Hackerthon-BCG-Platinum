@@ -15,7 +15,8 @@ class PatientListItem {
       sex: _asString(json['sex']),
       country: _asString(json['country']),
       primaryFocusArea: _asString(json['primary_focus_area']),
-      estimatedBiologicalAge: _asNullableDouble(json['estimated_biological_age']),
+      estimatedBiologicalAge:
+          _asNullableDouble(json['estimated_biological_age']),
     );
   }
 
@@ -37,6 +38,9 @@ class ExperienceSnapshot {
     required this.compass,
     required this.weeklyPlan,
     required this.coach,
+    required this.journeyStart,
+    required this.careContext,
+    required this.dataCoverage,
     required this.progressSummary,
     required this.alerts,
     required this.offers,
@@ -50,7 +54,11 @@ class ExperienceSnapshot {
       compass: CompassSnapshot.fromJson(_asMap(json['compass'])),
       weeklyPlan: WeeklyPlan.fromJson(_asMap(json['weekly_plan'])),
       coach: CoachSnapshot.fromJson(_asMap(json['coach'])),
-      progressSummary: ProgressSummary.fromJson(_asMap(json['progress_summary'])),
+      journeyStart: JourneyStart.fromJson(_asMap(json['journey_start'])),
+      careContext: CareContext.fromJson(_asMap(json['care_context'])),
+      dataCoverage: DataCoverage.fromJson(_asMap(json['data_coverage'])),
+      progressSummary:
+          ProgressSummary.fromJson(_asMap(json['progress_summary'])),
       alerts: AlertSummary.fromJson(_asMap(json['alerts'])),
       offers: OfferSummary.fromJson(_asMap(json['offers'])),
     );
@@ -62,9 +70,99 @@ class ExperienceSnapshot {
   final CompassSnapshot compass;
   final WeeklyPlan weeklyPlan;
   final CoachSnapshot coach;
+  final JourneyStart journeyStart;
+  final CareContext careContext;
+  final DataCoverage dataCoverage;
   final ProgressSummary progressSummary;
   final AlertSummary alerts;
   final OfferSummary offers;
+}
+
+class JourneyStart {
+  JourneyStart({
+    required this.title,
+    required this.summary,
+    required this.whatWeKnow,
+    required this.whatWeNeed,
+    required this.startHere,
+  });
+
+  factory JourneyStart.fromJson(Map<String, dynamic> json) {
+    return JourneyStart(
+      title: _asString(json['title']),
+      summary: _asString(json['summary']),
+      whatWeKnow: _asStringList(json['what_we_know']),
+      whatWeNeed: _asStringList(json['what_we_need']),
+      startHere: _asStringList(json['start_here']),
+    );
+  }
+
+  final String title;
+  final String summary;
+  final List<String> whatWeKnow;
+  final List<String> whatWeNeed;
+  final List<String> startHere;
+}
+
+class CareContext {
+  CareContext({
+    required this.headline,
+    required this.lastAppointmentTitle,
+    required this.lastAppointmentSummary,
+    required this.medications,
+    required this.conditions,
+    required this.clinicalPriorities,
+    required this.medicalGuardrail,
+  });
+
+  factory CareContext.fromJson(Map<String, dynamic> json) {
+    return CareContext(
+      headline: _asString(json['headline']),
+      lastAppointmentTitle: _asString(json['last_appointment_title']),
+      lastAppointmentSummary: _asString(json['last_appointment_summary']),
+      medications: _asStringList(json['medications']),
+      conditions: _asStringList(json['conditions']),
+      clinicalPriorities: _asStringList(json['clinical_priorities']),
+      medicalGuardrail: _asString(json['medical_guardrail']),
+    );
+  }
+
+  final String headline;
+  final String lastAppointmentTitle;
+  final String lastAppointmentSummary;
+  final List<String> medications;
+  final List<String> conditions;
+  final List<String> clinicalPriorities;
+  final String medicalGuardrail;
+}
+
+class DataCoverage {
+  DataCoverage({
+    required this.headline,
+    required this.confidenceLabel,
+    required this.connectedSources,
+    required this.missingSources,
+    required this.tailoringNote,
+    required this.needsMealTracking,
+  });
+
+  factory DataCoverage.fromJson(Map<String, dynamic> json) {
+    return DataCoverage(
+      headline: _asString(json['headline']),
+      confidenceLabel: _asString(json['confidence_label']),
+      connectedSources: _asStringList(json['connected_sources']),
+      missingSources: _asStringList(json['missing_sources']),
+      tailoringNote: _asString(json['tailoring_note']),
+      needsMealTracking: _asBool(json['needs_meal_tracking']),
+    );
+  }
+
+  final String headline;
+  final String confidenceLabel;
+  final List<String> connectedSources;
+  final List<String> missingSources;
+  final String tailoringNote;
+  final bool needsMealTracking;
 }
 
 class ProfileSummary {
@@ -83,7 +181,8 @@ class ProfileSummary {
       age: _asInt(json['age']),
       sex: _asString(json['sex']),
       country: _asString(json['country']),
-      estimatedBiologicalAge: _asNullableDouble(json['estimated_biological_age']),
+      estimatedBiologicalAge:
+          _asNullableDouble(json['estimated_biological_age']),
       ageGapYears: _asNullableDouble(json['age_gap_years']),
     );
   }
@@ -103,6 +202,7 @@ class CompassSnapshot {
     required this.estimatedBiologicalAge,
     required this.primaryFocus,
     required this.pillars,
+    required this.peerComparison,
     required this.suggestedQuestions,
   });
 
@@ -110,11 +210,14 @@ class CompassSnapshot {
     return CompassSnapshot(
       overallDirection: _asString(json['overall_direction']),
       chronologicalAge: _asInt(json['chronological_age']),
-      estimatedBiologicalAge: _asNullableDouble(json['estimated_biological_age']),
+      estimatedBiologicalAge:
+          _asNullableDouble(json['estimated_biological_age']),
       primaryFocus: PrimaryFocus.fromJson(_asMap(json['primary_focus'])),
       pillars: _asObjectList(json['pillars'], PillarSnapshot.fromJson),
-      suggestedQuestions:
-          _asStringList(json['suggested_questions']),
+      peerComparison: PeerComparisonSnapshot.fromJson(
+        _asMap(json['peer_comparison']),
+      ),
+      suggestedQuestions: _asStringList(json['suggested_questions']),
     );
   }
 
@@ -123,7 +226,66 @@ class CompassSnapshot {
   final double? estimatedBiologicalAge;
   final PrimaryFocus primaryFocus;
   final List<PillarSnapshot> pillars;
+  final PeerComparisonSnapshot peerComparison;
   final List<String> suggestedQuestions;
+}
+
+class PeerComparisonSnapshot {
+  PeerComparisonSnapshot({
+    required this.headline,
+    required this.cohortLabel,
+    required this.sampleSize,
+    required this.strongestRelativePillarId,
+    required this.biggestGapPillarId,
+    required this.items,
+  });
+
+  factory PeerComparisonSnapshot.fromJson(Map<String, dynamic> json) {
+    return PeerComparisonSnapshot(
+      headline: _asString(json['headline']),
+      cohortLabel: _asString(json['cohort_label']),
+      sampleSize: _asInt(json['sample_size']),
+      strongestRelativePillarId:
+          _asString(json['strongest_relative_pillar_id']),
+      biggestGapPillarId: _asString(json['biggest_gap_pillar_id']),
+      items: _asObjectList(json['items'], PeerComparisonItem.fromJson),
+    );
+  }
+
+  final String headline;
+  final String cohortLabel;
+  final int sampleSize;
+  final String strongestRelativePillarId;
+  final String biggestGapPillarId;
+  final List<PeerComparisonItem> items;
+
+  bool get hasItems => items.isNotEmpty;
+}
+
+class PeerComparisonItem {
+  PeerComparisonItem({
+    required this.pillarId,
+    required this.pillarName,
+    required this.patientScore,
+    required this.peerScore,
+    required this.difference,
+  });
+
+  factory PeerComparisonItem.fromJson(Map<String, dynamic> json) {
+    return PeerComparisonItem(
+      pillarId: _asString(json['pillar_id']),
+      pillarName: _asString(json['pillar_name']),
+      patientScore: _asDouble(json['patient_score']),
+      peerScore: _asDouble(json['peer_score']),
+      difference: _asDouble(json['difference']),
+    );
+  }
+
+  final String pillarId;
+  final String pillarName;
+  final double patientScore;
+  final double peerScore;
+  final double difference;
 }
 
 class PrimaryFocus {
@@ -246,7 +408,8 @@ class ProgressSummary {
     return ProgressSummary(
       latestReadingDate: _asDateTime(json['latest_reading_date']),
       latestSnapshot: LatestSnapshot.fromJson(_asMap(json['latest_snapshot'])),
-      headlineTrends: _asObjectList(json['headline_trends'], HeadlineTrend.fromJson),
+      headlineTrends:
+          _asObjectList(json['headline_trends'], HeadlineTrend.fromJson),
     );
   }
 
@@ -386,6 +549,17 @@ class OfferOpportunity {
     required this.offerLabel,
     required this.rationale,
     required this.priority,
+    required this.category,
+    required this.summary,
+    required this.whyNow,
+    required this.includes,
+    required this.expectedOutcome,
+    required this.timeCommitment,
+    required this.dataUsed,
+    required this.missingData,
+    required this.firstWeek,
+    required this.caution,
+    required this.personalizationNote,
   });
 
   factory OfferOpportunity.fromJson(Map<String, dynamic> json) {
@@ -394,6 +568,17 @@ class OfferOpportunity {
       offerLabel: _asString(json['offer_label']),
       rationale: _asString(json['rationale']),
       priority: _asInt(json['priority']),
+      category: _asString(json['category']),
+      summary: _asString(json['summary']),
+      whyNow: _asString(json['why_now']),
+      includes: _asStringList(json['includes']),
+      expectedOutcome: _asString(json['expected_outcome']),
+      timeCommitment: _asString(json['time_commitment']),
+      dataUsed: _asStringList(json['data_used']),
+      missingData: _asStringList(json['missing_data']),
+      firstWeek: _asStringList(json['first_week']),
+      caution: _asString(json['caution']),
+      personalizationNote: _asString(json['personalization_note']),
     );
   }
 
@@ -401,6 +586,17 @@ class OfferOpportunity {
   final String offerLabel;
   final String rationale;
   final int priority;
+  final String category;
+  final String summary;
+  final String whyNow;
+  final List<String> includes;
+  final String expectedOutcome;
+  final String timeCommitment;
+  final List<String> dataUsed;
+  final List<String> missingData;
+  final List<String> firstWeek;
+  final String caution;
+  final String personalizationNote;
 }
 
 class CoachReply {
@@ -496,6 +692,16 @@ double? _asNullableDouble(dynamic value) {
     return value.toDouble();
   }
   return double.tryParse(value.toString());
+}
+
+bool _asBool(dynamic value) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is String) {
+    return value.toLowerCase() == 'true';
+  }
+  return false;
 }
 
 DateTime? _asDateTime(dynamic value) {
