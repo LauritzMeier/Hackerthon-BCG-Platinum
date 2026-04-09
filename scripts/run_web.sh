@@ -21,7 +21,7 @@ Usage: ./scripts/run_web.sh [options] [-- flutter_run_args...]
 
 Defaults:
   - Launches the Flutter web app on Chrome.
-  - Runs with the local API base URL.
+  - Uses Firestore-first mode when Firebase is enabled.
   - Enables Firebase automatically if the app is already configured.
 
 Options:
@@ -111,7 +111,7 @@ if [[ "$ENABLE_FIREBASE" == "true" ]] && ! firebase_is_configured; then
   die "Firebase is enabled but the app is not configured yet. Run ./scripts/setup_firebase.sh --project <firebase-project-id> first."
 fi
 
-if [[ "$DRY_RUN" != "true" ]]; then
+if [[ "$DRY_RUN" != "true" && "$ENABLE_FIREBASE" != "true" ]]; then
   ensure_local_api_warning "$API_BASE_URL"
 fi
 

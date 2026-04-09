@@ -52,77 +52,72 @@ class _CoachScreenState extends State<CoachScreen> {
           children: [
             ScreenHeader(
               eyebrow: experience.coach.coachName,
-              title: 'Talk through what happened and what to do next.',
+              title:
+                  'Ask about your recovery, your last visit, or your next step.',
               subtitle:
-                  'A new user should feel like the coach already knows their health context, explains it in plain language, and is honest about what still needs tracking.',
+                  'You should not need to start from zero. I already have your last doctor context and your connected watch data.',
             ),
             const SizedBox(height: 24),
             SectionSurface(
-              title: 'What I already know about you',
-              subtitle: experience.careContext.headline,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    experience.coach.intro,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          height: 1.45,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppPalette.sand.withValues(alpha: 0.85),
-                      borderRadius: BorderRadius.circular(20),
+              title: 'What I already know',
+              subtitle: 'This is the context I use before I answer anything.',
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final stacked = constraints.maxWidth < 900;
+                  final cards = [
+                    _CoachContextCard(
+                      title: 'From your last appointment',
+                      body: experience.careContext.lastAppointmentSummary,
+                      accent: AppPalette.sand.withValues(alpha: 0.82),
+                      itemsTitle: 'Priorities now',
+                      items: experience.careContext.clinicalPriorities
+                          .take(3)
+                          .toList(growable: false),
+                      footer: experience.careContext.medicalGuardrail,
                     ),
-                    child: Text(
-                      experience.careContext.lastAppointmentSummary,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            height: 1.4,
-                            color: AppPalette.ink.withValues(alpha: 0.82),
-                          ),
+                    _CoachContextCard(
+                      title: 'To personalize more',
+                      body: experience.dataCoverage.tailoringNote,
+                      accent: AppPalette.mint.withValues(alpha: 0.34),
+                      itemsTitle: 'Still missing',
+                      items: experience.dataCoverage.missingSources
+                          .take(3)
+                          .toList(growable: false),
+                      footer: experience.dataCoverage.needsMealTracking
+                          ? 'The fastest improvement is to log one meal a day for 7 days.'
+                          : null,
                     ),
-                  ),
-                  if (experience.careContext.medications.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    _CoachInfoList(
-                      title: 'Medications on file',
-                      items: experience.careContext.medications,
-                    ),
-                  ],
-                ],
+                  ];
+
+                  if (stacked) {
+                    return Column(
+                      children: [
+                        for (var index = 0; index < cards.length; index++) ...[
+                          cards[index],
+                          if (index < cards.length - 1)
+                            const SizedBox(height: 12),
+                        ],
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var index = 0; index < cards.length; index++) ...[
+                        Expanded(child: cards[index]),
+                        if (index < cards.length - 1) const SizedBox(width: 12),
+                      ],
+                    ],
+                  );
+                },
               ),
             ),
             const SizedBox(height: 24),
             SectionSurface(
-              title: 'How I can tailor better',
-              subtitle: experience.dataCoverage.confidenceLabel,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    experience.dataCoverage.tailoringNote,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          height: 1.45,
-                        ),
-                  ),
-                  if (experience.dataCoverage.missingSources.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    _CoachInfoList(
-                      title: 'What is still missing',
-                      items: experience.dataCoverage.missingSources,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            SectionSurface(
-              title: 'Suggested prompts',
+              title: 'Good first questions',
               subtitle:
-                  'These prompts should help a new user get oriented without guessing what to ask first.',
+                  'Start here if you want the coach to explain the plan in plain language.',
               child: Wrap(
                 spacing: 10,
                 runSpacing: 10,
@@ -138,9 +133,9 @@ class _CoachScreenState extends State<CoachScreen> {
             ),
             const SizedBox(height: 24),
             SectionSurface(
-              title: 'Conversation',
+              title: 'Chat',
               subtitle:
-                  'Use the coach to explain your last visit, your next step, or what would make the plan more personal.',
+                  'Use this to clarify the plan, explain what changed, or ask what support makes sense next.',
               child: Column(
                 children: [
                   for (final message in controller.chatMessages) ...[
@@ -182,35 +177,6 @@ class _CoachScreenState extends State<CoachScreen> {
                   child: const Text('Send'),
                 ),
               ],
-            ),
-            const SizedBox(height: 24),
-            SectionSurface(
-              title: 'Conversation sync status',
-              subtitle:
-                  'Kept for demos and backend handoff checks, but no longer shown as the primary user story.',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    controller.firestoreStatusMessage ??
-                        'Firebase session status has not been checked yet.',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    controller.isFirebaseEnabled
-                        ? 'Authentication mode: Firebase anonymous sign-in.'
-                        : 'Enable Firebase with `APP_ENABLE_FIREBASE=true` to persist messages.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.color
-                              ?.withValues(alpha: 0.72),
-                        ),
-                  ),
-                ],
-              ),
             ),
           ],
         );
@@ -268,6 +234,74 @@ class _CoachInfoList extends StatelessWidget {
           if (index < items.length - 1) const SizedBox(height: 10),
         ],
       ],
+    );
+  }
+}
+
+class _CoachContextCard extends StatelessWidget {
+  const _CoachContextCard({
+    required this.title,
+    required this.body,
+    required this.accent,
+    this.itemsTitle,
+    this.items = const <String>[],
+    this.footer,
+  });
+
+  final String title;
+  final String body;
+  final Color accent;
+  final String? itemsTitle;
+  final List<String> items;
+  final String? footer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: accent,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppPalette.ink,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            body,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppPalette.ink.withValues(alpha: 0.8),
+                  height: 1.45,
+                ),
+          ),
+          if (itemsTitle != null && items.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _CoachInfoList(
+              title: itemsTitle!,
+              items: items,
+            ),
+          ],
+          if (footer != null && footer!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              footer!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppPalette.ink,
+                    fontWeight: FontWeight.w700,
+                    height: 1.4,
+                  ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

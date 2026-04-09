@@ -24,6 +24,7 @@ Usage: ./scripts/run_android.sh [options] [-- flutter_run_args...]
 Defaults:
   - Uses a connected physical Android device if one is available.
   - Otherwise launches the ${DEFAULT_ANDROID_EMULATOR_ID} emulator.
+  - Uses Firestore-first mode when Firebase is enabled.
   - Enables Firebase automatically if the app is already configured.
 
 Options:
@@ -166,7 +167,7 @@ else
   API_BASE_URL="${API_BASE_URL:-http://10.0.2.2:8000}"
 fi
 
-if [[ "$DRY_RUN" != "true" ]]; then
+if [[ "$DRY_RUN" != "true" && "$ENABLE_FIREBASE" != "true" ]]; then
   ensure_local_api_warning "$API_BASE_URL"
 fi
 

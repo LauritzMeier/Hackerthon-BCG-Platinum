@@ -10,6 +10,10 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
 
+    match /offer_catalog/{offerCode} {
+      allow read: if request.auth != null;
+    }
+
     match /coach_conversations/{patientId} {
       allow read: if request.auth != null;
       allow create, update: if request.auth != null

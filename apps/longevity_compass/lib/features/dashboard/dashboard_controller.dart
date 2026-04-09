@@ -71,7 +71,8 @@ class DashboardController extends ChangeNotifier {
   Future<void> sendCoachMessage(String message) async {
     final patientId = selectedPatientId;
     final trimmed = message.trim();
-    if (patientId == null || trimmed.isEmpty) {
+    final currentExperience = experience;
+    if (patientId == null || trimmed.isEmpty || currentExperience == null) {
       return;
     }
 
@@ -90,7 +91,11 @@ class DashboardController extends ChangeNotifier {
       );
       _updateFirestoreStatus(userWriteResult);
 
-      final reply = await _repository.sendCoachMessage(patientId, trimmed);
+      final reply = await _repository.sendCoachMessage(
+        patientId,
+        trimmed,
+        experience: currentExperience,
+      );
       final assistantMessage = ChatMessage.assistant(reply.reply);
       chatMessages = <ChatMessage>[...chatMessages, assistantMessage];
 
@@ -102,7 +107,7 @@ class DashboardController extends ChangeNotifier {
     } catch (error) {
       errorMessage = error.toString();
       final fallbackMessage = ChatMessage.assistant(
-        'I could not reach the coach service just now, but your weekly plan is still available.',
+        'I saved your note, but I could not shape a useful reply from your current context just now.',
       );
       chatMessages = <ChatMessage>[...chatMessages, fallbackMessage];
 

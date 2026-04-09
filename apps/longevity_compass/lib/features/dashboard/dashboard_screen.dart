@@ -38,11 +38,10 @@ class DashboardScreen extends StatelessWidget {
             padding: const EdgeInsets.all(24),
             children: [
               ScreenHeader(
-                eyebrow: 'Longevity Compass',
-                title:
-                    'Understand your health, then take one sensible next step.',
+                eyebrow: 'Today',
+                title: 'Keep this week simple.',
                 subtitle:
-                    'A new user should quickly see what the app already knows, what is still missing, and which next step is actually worth attention.',
+                    'See where you stand, the one goal for this week, and what would make the plan more personal.',
                 trailing: _PatientPicker(
                   patients: controller.patients,
                   selectedPatientId: controller.selectedPatientId,
@@ -58,27 +57,80 @@ class DashboardScreen extends StatelessWidget {
                 CompassRadarCard(experience: experience),
                 const SizedBox(height: 24),
               ],
+              CompassHeroCard(experience: experience),
+              const SizedBox(height: 24),
               SectionSurface(
-                title: experience.journeyStart.title,
-                subtitle: experience.journeyStart.summary,
+                title: 'This week\'s focus',
+                subtitle:
+                    'Start with the smallest set of actions that can actually move the week forward.',
+                child: Column(
+                  children: [
+                    for (var index = 0;
+                        index < experience.weeklyPlan.actions.length;
+                        index++) ...[
+                      ActionTile(
+                        index: index + 1,
+                        action: experience.weeklyPlan.actions[index],
+                      ),
+                      if (index < experience.weeklyPlan.actions.length - 1)
+                        const SizedBox(height: 12),
+                    ],
+                    if (experience.weeklyPlan.checkInPrompt.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppPalette.mint.withValues(alpha: 0.34),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Text(
+                          experience.weeklyPlan.checkInPrompt,
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppPalette.ink,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.4,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              SectionSurface(
+                title: 'What informs the plan',
+                subtitle:
+                    'We use your doctor context and your connected signals, and we are explicit about what is still missing.',
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final stacked = constraints.maxWidth < 900;
-                    final panels = [
-                      _JourneyPanel(
-                        title: 'What we already know',
-                        items: experience.journeyStart.whatWeKnow,
-                        color: AppPalette.mint,
+                    final cards = [
+                      _DashboardDetailCard(
+                        title: 'From your last appointment',
+                        body: experience.careContext.lastAppointmentSummary,
+                        tagsTitle: 'Medications on file',
+                        tags: experience.careContext.medications,
+                        listTitle: 'Priorities now',
+                        listItems: experience.careContext.clinicalPriorities
+                            .take(3)
+                            .toList(growable: false),
+                        footer: experience.careContext.medicalGuardrail,
+                        footerColor: AppPalette.sand.withValues(alpha: 0.92),
                       ),
-                      _JourneyPanel(
-                        title: 'What we still need',
-                        items: experience.journeyStart.whatWeNeed,
-                        color: AppPalette.sand,
-                      ),
-                      _JourneyPanel(
-                        title: 'Start here',
-                        items: experience.journeyStart.startHere,
-                        color: AppPalette.coral,
+                      _DashboardDetailCard(
+                        title: 'To personalize next',
+                        body: experience.dataCoverage.headline,
+                        tagsTitle: 'Already connected',
+                        tags: experience.dataCoverage.connectedSources
+                            .take(3)
+                            .toList(growable: false),
+                        listTitle: 'Still missing',
+                        listItems: experience.dataCoverage.missingSources
+                            .take(3)
+                            .toList(growable: false),
+                        footer: experience.dataCoverage.tailoringNote,
                       ),
                     ];
 
@@ -86,10 +138,10 @@ class DashboardScreen extends StatelessWidget {
                       return Column(
                         children: [
                           for (var index = 0;
-                              index < panels.length;
+                              index < cards.length;
                               index++) ...[
-                            panels[index],
-                            if (index < panels.length - 1)
+                            cards[index],
+                            if (index < cards.length - 1)
                               const SizedBox(height: 12),
                           ],
                         ],
@@ -99,9 +151,9 @@ class DashboardScreen extends StatelessWidget {
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        for (var index = 0; index < panels.length; index++) ...[
-                          Expanded(child: panels[index]),
-                          if (index < panels.length - 1)
+                        for (var index = 0; index < cards.length; index++) ...[
+                          Expanded(child: cards[index]),
+                          if (index < cards.length - 1)
                             const SizedBox(width: 12),
                         ],
                       ],
@@ -110,172 +162,52 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              CompassHeroCard(experience: experience),
-              const SizedBox(height: 24),
-              SectionSurface(
-                title: experience.careContext.lastAppointmentTitle,
-                subtitle: experience.careContext.headline,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      experience.careContext.lastAppointmentSummary,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            height: 1.45,
-                          ),
-                    ),
-                    if (experience.careContext.medications.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      _InfoTagWrap(
-                        title: 'Medications on file',
-                        items: experience.careContext.medications,
-                      ),
-                    ],
-                    if (experience
-                        .careContext.clinicalPriorities.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      _InfoTagWrap(
-                        title: 'What needs attention now',
-                        items: experience.careContext.clinicalPriorities,
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppPalette.sand.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        experience.careContext.medicalGuardrail,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              height: 1.4,
-                              color: AppPalette.ink,
-                              fontWeight: FontWeight.w600,
+              if (experience.progressSummary.headlineTrends.isNotEmpty)
+                SectionSurface(
+                  title: 'Recent watch signals',
+                  subtitle:
+                      'Use these as a quick recovery read, not as another thing to overthink.',
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stacked = constraints.maxWidth < 760;
+                      final trends = experience.progressSummary.headlineTrends
+                          .take(3)
+                          .toList(growable: false);
+                      final children = trends
+                          .map(
+                            (trend) => Expanded(
+                              child: MetricTrendTile(trend: trend),
                             ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              SectionSurface(
-                title: 'How personal the recommendations can be today',
-                subtitle: experience.dataCoverage.headline,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _DataCoverageRow(
-                      title: 'Connected data',
-                      items: experience.dataCoverage.connectedSources,
-                    ),
-                    const SizedBox(height: 16),
-                    _DataCoverageRow(
-                      title: 'Still missing',
-                      items: experience.dataCoverage.missingSources,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      experience.dataCoverage.tailoringNote,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            height: 1.45,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              SectionSurface(
-                title: 'Six pillars',
-                subtitle:
-                    'Everything in the app is derived from these six health pillars.',
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final crossAxisCount = constraints.maxWidth >= 980
-                        ? 3
-                        : constraints.maxWidth >= 640
-                            ? 2
-                            : 1;
+                          )
+                          .toList(growable: false);
 
-                    return GridView.builder(
-                      shrinkWrap: true,
-                      itemCount: experience.compass.pillars.length,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossAxisCount,
-                        mainAxisSpacing: 14,
-                        crossAxisSpacing: 14,
-                        childAspectRatio: crossAxisCount == 1 ? 1.65 : 1.15,
-                      ),
-                      itemBuilder: (context, index) {
-                        return PillarCard(
-                          pillar: experience.compass.pillars[index],
+                      if (stacked) {
+                        return Column(
+                          children: trends
+                              .map(
+                                (trend) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: MetricTrendTile(trend: trend),
+                                ),
+                              )
+                              .toList(growable: false),
                         );
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 24),
-              SectionSurface(
-                title: 'Recent trend signals',
-                subtitle:
-                    'A lightweight read on what has shifted between your recent and longer baseline.',
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final stacked = constraints.maxWidth < 760;
-                    final children = experience.progressSummary.headlineTrends
-                        .map((trend) =>
-                            Expanded(child: MetricTrendTile(trend: trend)))
-                        .toList(growable: false);
+                      }
 
-                    if (stacked) {
-                      return Column(
-                        children: experience.progressSummary.headlineTrends
-                            .map(
-                              (trend) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: MetricTrendTile(trend: trend),
-                              ),
-                            )
-                            .toList(growable: false),
-                      );
-                    }
-
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (var index = 0;
-                            index < children.length;
-                            index++) ...[
-                          if (index > 0) const SizedBox(width: 12),
-                          children[index],
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var index = 0;
+                              index < children.length;
+                              index++) ...[
+                            if (index > 0) const SizedBox(width: 12),
+                            children[index],
+                          ],
                         ],
-                      ],
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              SectionSurface(
-                title: 'Flags and next-best support',
-                subtitle:
-                    'High-priority drift should lead to one understandable next step, not a wall of options.',
-                child: Column(
-                  children: [
-                    for (final flag in experience.alerts.items) ...[
-                      _FlagTile(flag: flag),
-                      const SizedBox(height: 12),
-                    ],
-                    if (experience.offers.recommended != null)
-                      OfferTile(
-                        offer: experience.offers.recommended!,
-                        highlight: true,
-                      ),
-                  ],
-                ),
-              ),
               if (controller.errorMessage != null) ...[
                 const SizedBox(height: 18),
                 Text(
@@ -294,16 +226,26 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-class _JourneyPanel extends StatelessWidget {
-  const _JourneyPanel({
+class _DashboardDetailCard extends StatelessWidget {
+  const _DashboardDetailCard({
     required this.title,
-    required this.items,
-    required this.color,
+    required this.body,
+    this.tagsTitle,
+    this.tags = const <String>[],
+    this.listTitle,
+    this.listItems = const <String>[],
+    this.footer,
+    this.footerColor,
   });
 
   final String title;
-  final List<String> items;
-  final Color color;
+  final String body;
+  final String? tagsTitle;
+  final List<String> tags;
+  final String? listTitle;
+  final List<String> listItems;
+  final String? footer;
+  final Color? footerColor;
 
   @override
   Widget build(BuildContext context) {
@@ -311,7 +253,7 @@ class _JourneyPanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.35),
+        color: Colors.white.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
@@ -320,36 +262,50 @@ class _JourneyPanel extends StatelessWidget {
           Text(
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
                   color: AppPalette.ink,
+                  fontWeight: FontWeight.w700,
                 ),
           ),
           const SizedBox(height: 12),
-          for (var index = 0; index < items.length; index++) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: Icon(
-                    Icons.circle,
-                    size: 8,
-                    color: AppPalette.forest,
-                  ),
+          Text(
+            body,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppPalette.ink.withValues(alpha: 0.76),
+                  height: 1.45,
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    items[index],
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppPalette.ink.withValues(alpha: 0.78),
-                          height: 1.45,
-                        ),
-                  ),
-                ),
-              ],
+          ),
+          if (tagsTitle != null && tags.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _InfoTagWrap(
+              title: tagsTitle!,
+              items: tags,
             ),
-            if (index < items.length - 1) const SizedBox(height: 10),
+          ],
+          if (listTitle != null && listItems.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _BulletList(
+              title: listTitle!,
+              items: listItems,
+            ),
+          ],
+          if (footer != null && footer!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: footerColor ?? AppPalette.mint.withValues(alpha: 0.32),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Text(
+                footer!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppPalette.ink,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+              ),
+            ),
           ],
         ],
       ),
@@ -403,8 +359,8 @@ class _InfoTagWrap extends StatelessWidget {
   }
 }
 
-class _DataCoverageRow extends StatelessWidget {
-  const _DataCoverageRow({
+class _BulletList extends StatelessWidget {
+  const _BulletList({
     required this.title,
     required this.items,
   });
@@ -429,14 +385,13 @@ class _DataCoverageRow extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                title == 'Connected data'
-                    ? Icons.check_circle_rounded
-                    : Icons.warning_amber_rounded,
-                size: 18,
-                color: title == 'Connected data'
-                    ? AppPalette.forest
-                    : AppPalette.amber,
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Icon(
+                  Icons.circle,
+                  size: 8,
+                  color: AppPalette.forest,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -444,7 +399,7 @@ class _DataCoverageRow extends StatelessWidget {
                   items[index],
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppPalette.ink.withValues(alpha: 0.76),
-                        height: 1.4,
+                        height: 1.45,
                       ),
                 ),
               ),
@@ -476,7 +431,7 @@ class _PatientPicker extends StatelessWidget {
         initialValue: selectedPatientId,
         isExpanded: true,
         decoration: const InputDecoration(
-          labelText: 'Demo patient',
+          labelText: 'Patient',
         ),
         items: patients
             .map(
@@ -490,58 +445,6 @@ class _PatientPicker extends StatelessWidget {
             )
             .toList(growable: false),
         onChanged: onChanged,
-      ),
-    );
-  }
-}
-
-class _FlagTile extends StatelessWidget {
-  const _FlagTile({required this.flag});
-
-  final RiskFlag flag;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (flag.severity) {
-      'high' => AppPalette.coral,
-      'medium' => AppPalette.amber,
-      _ => AppPalette.forest,
-    };
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            flag.title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppPalette.ink,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            flag.rationale,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppPalette.ink.withValues(alpha: 0.72),
-                  height: 1.4,
-                ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            flag.recommendedAction,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ],
       ),
     );
   }

@@ -267,25 +267,47 @@ class PeerComparisonItem {
     required this.pillarId,
     required this.pillarName,
     required this.patientScore,
+    required this.patientScoreLabel,
     required this.peerScore,
+    required this.peerScoreLabel,
     required this.difference,
+    required this.hasEnoughData,
+    required this.scoreConfidence,
   });
 
   factory PeerComparisonItem.fromJson(Map<String, dynamic> json) {
+    final patientScore = _asDouble(json['patient_score']);
+    final peerScore = _asDouble(json['peer_score']);
+    final patientScoreLabel = _asString(json['patient_score_label']);
+    final peerScoreLabel = _asString(json['peer_score_label']);
     return PeerComparisonItem(
       pillarId: _asString(json['pillar_id']),
       pillarName: _asString(json['pillar_name']),
-      patientScore: _asDouble(json['patient_score']),
-      peerScore: _asDouble(json['peer_score']),
+      patientScore: patientScore,
+      patientScoreLabel: patientScoreLabel.isNotEmpty
+          ? patientScoreLabel
+          : patientScore.toStringAsFixed(0),
+      peerScore: peerScore,
+      peerScoreLabel: peerScoreLabel.isNotEmpty
+          ? peerScoreLabel
+          : peerScore.toStringAsFixed(0),
       difference: _asDouble(json['difference']),
+      hasEnoughData: json.containsKey('has_enough_data')
+          ? _asBool(json['has_enough_data'])
+          : true,
+      scoreConfidence: _asString(json['score_confidence']),
     );
   }
 
   final String pillarId;
   final String pillarName;
   final double patientScore;
+  final String patientScoreLabel;
   final double peerScore;
+  final String peerScoreLabel;
   final double difference;
+  final bool hasEnoughData;
+  final String scoreConfidence;
 }
 
 class PrimaryFocus {
@@ -313,28 +335,41 @@ class PillarSnapshot {
     required this.id,
     required this.name,
     required this.score,
+    required this.scoreLabel,
     required this.state,
     required this.trend,
     required this.whyItMatters,
+    required this.hasEnoughData,
+    required this.scoreConfidence,
   });
 
   factory PillarSnapshot.fromJson(Map<String, dynamic> json) {
+    final score = _asDouble(json['score']);
+    final scoreLabel = _asString(json['score_label']);
     return PillarSnapshot(
       id: _asString(json['id']),
       name: _asString(json['name']),
-      score: _asDouble(json['score']),
+      score: score,
+      scoreLabel: scoreLabel.isNotEmpty ? scoreLabel : score.toStringAsFixed(0),
       state: _asString(json['state']),
       trend: _asString(json['trend']),
       whyItMatters: _asString(json['why_it_matters']),
+      hasEnoughData: json.containsKey('has_enough_data')
+          ? _asBool(json['has_enough_data'])
+          : true,
+      scoreConfidence: _asString(json['score_confidence']),
     );
   }
 
   final String id;
   final String name;
   final double score;
+  final String scoreLabel;
   final String state;
   final String trend;
   final String whyItMatters;
+  final bool hasEnoughData;
+  final String scoreConfidence;
 }
 
 class WeeklyPlan {

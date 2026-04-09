@@ -60,6 +60,32 @@ def _normalize(obj):
     return obj
 
 
+def _parse_date(value) -> Optional[datetime]:
+    if not value:
+        return None
+
+    text = str(value)
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
+            try:
+                return datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+    return None
+
+
+def _is_recent_date(value, max_age_days: int = 45) -> bool:
+    parsed = _parse_date(value)
+    if parsed is None:
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    age = datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)
+    return age.days <= max_age_days
+
+
 def _build_sleep_pillar(profile: Dict) -> Dict:
     score = _to_float(profile.get("sleep_recovery_score"))
     quality_delta = _to_float(profile.get("sleep_quality_7d_avg")) - _to_float(
@@ -219,14 +245,66 @@ def _build_mental_pillar(profile: Dict) -> Dict:
     }
 
 
+def _has_recent_wearable_signal(profile: Dict) -> bool:
+    return bool(profile.get("latest_wearable_date"))
+
+
+def _has_meal_tracking(profile: Dict) -> bool:
+    # A survey gives broad habit context, but it is not the same thing as
+    # day-by-day meal logging that can support personalized nutrition guidance.
+    return bool(profile.get("meals_logged_days"))
+
+
+def _has_recent_survey_signal(profile: Dict) -> bool:
+    return _is_recent_date(profile.get("latest_survey_date"), max_age_days=365)
+
+
+def _has_recent_lab_signal(profile: Dict) -> bool:
+    lab_fields = [
+        profile.get("hba1c_pct"),
+        profile.get("fasting_glucose_mmol"),
+        profile.get("ldl_mmol"),
+        profile.get("bmi"),
+    ]
+    present_labs = sum(1 for value in lab_fields if value not in (None, ""))
+    return present_labs >= 2
+
+
+def _pillar_score_confidence(pillar_id: str, profile: Dict) -> str:
+    if pillar_id in {"sleep_recovery", "cardiovascular_health", "movement_fitness"}:
+        return "high" if _has_recent_wearable_signal(profile) else "low"
+    if pillar_id == "nutrition_quality":
+        return "high" if _has_meal_tracking(profile) else "low"
+    if pillar_id == "mental_resilience":
+        return "medium" if _has_recent_survey_signal(profile) else "low"
+    if pillar_id == "metabolic_health":
+        return "high" if _has_recent_lab_signal(profile) else "medium"
+    return "medium"
+
+
+def _score_label(score: float, confidence: str) -> str:
+    if confidence == "low":
+        return "?"
+    return f"{_round(score):.0f}"
+
+
+def _with_score_metadata(pillar: Dict, profile: Dict) -> Dict:
+    confidence = _pillar_score_confidence(pillar["id"], profile)
+    enriched = dict(pillar)
+    enriched["score_confidence"] = confidence
+    enriched["score_label"] = _score_label(_to_float(pillar["score"]), confidence)
+    enriched["has_enough_data"] = confidence != "low"
+    return enriched
+
+
 def _build_pillars(profile: Dict) -> List[Dict]:
     pillars = [
-        _build_sleep_pillar(profile),
-        _build_cardiovascular_pillar(profile),
-        _build_metabolic_pillar(profile),
-        _build_movement_pillar(profile),
-        _build_nutrition_pillar(profile),
-        _build_mental_pillar(profile),
+        _with_score_metadata(_build_sleep_pillar(profile), profile),
+        _with_score_metadata(_build_cardiovascular_pillar(profile), profile),
+        _with_score_metadata(_build_metabolic_pillar(profile), profile),
+        _with_score_metadata(_build_movement_pillar(profile), profile),
+        _with_score_metadata(_build_nutrition_pillar(profile), profile),
+        _with_score_metadata(_build_mental_pillar(profile), profile),
     ]
     pillars.sort(key=lambda pillar: PILLAR_DISPLAY_ORDER.index(pillar["id"]))
     return pillars
@@ -240,8 +318,18 @@ def _pillar_by_id(pillars: List[Dict], pillar_id: str) -> Optional[Dict]:
 
 
 def _overall_direction(pillars: List[Dict]) -> str:
-    drifting = sum(1 for pillar in pillars if pillar["trend"] == "drifting")
-    avg_score = sum(pillar["score"] for pillar in pillars) / max(1, len(pillars))
+    confident_pillars = [
+        pillar for pillar in pillars if pillar.get("score_confidence") != "low"
+    ]
+    if not confident_pillars:
+        return "mixed"
+
+    drifting = sum(
+        1 for pillar in confident_pillars if pillar["trend"] == "drifting"
+    )
+    avg_score = sum(pillar["score"] for pillar in confident_pillars) / max(
+        1, len(confident_pillars)
+    )
     if drifting >= 3 or avg_score < 55:
         return "drifting"
     if drifting == 0 and avg_score >= 70:
@@ -249,20 +337,39 @@ def _overall_direction(pillars: List[Dict]) -> str:
     return "mixed"
 
 
-def _choose_primary_focus(pillars: List[Dict]) -> Dict:
+def _focus_actionability(pillar_id: str, profile: Dict) -> int:
+    confidence = _pillar_score_confidence(pillar_id, profile)
+    if confidence == "low":
+        return 3
+    if pillar_id in {"nutrition_quality", "metabolic_health"} and not _has_meal_tracking(profile):
+        return 1
+    if pillar_id in {"sleep_recovery", "cardiovascular_health", "movement_fitness"} and not _has_recent_wearable_signal(profile):
+        return 1
+    return 0
+
+
+def _choose_primary_focus(pillars: List[Dict], profile: Dict) -> Dict:
     def focus_rank(pillar: Dict):
+        actionability_weight = _focus_actionability(pillar["id"], profile)
         trend_weight = {"drifting": 0, "stable": 1, "improving": 2}[pillar["trend"]]
         state_weight = {"needs_focus": 0, "watch": 1, "strong": 2}[pillar["state"]]
-        return (trend_weight, state_weight, pillar["score"])
+        return (actionability_weight, trend_weight, state_weight, pillar["score"])
 
     focus_pillar = sorted(pillars, key=focus_rank)[0]
+    if _focus_actionability(focus_pillar["id"], profile) == 0:
+        why_now = (
+            f"{focus_pillar['name']} is the clearest place to start because the app has live signal for it "
+            f"and it is currently rated {focus_pillar['state']}."
+        )
+    else:
+        why_now = (
+            f"{focus_pillar['name']} still matters, but parts of it need better tracking before the app can tailor it well."
+        )
+
     return {
         "pillar_id": focus_pillar["id"],
         "pillar_name": focus_pillar["name"],
-        "why_now": (
-            f"{focus_pillar['name']} is the strongest lever right now because it is "
-            f"{focus_pillar['trend']} and currently rated {focus_pillar['state']}."
-        ),
+        "why_now": why_now,
     }
 
 
@@ -301,8 +408,15 @@ def _build_peer_comparison(profile: Dict, pillars: List[Dict], age_peers: List[D
                 "pillar_id": pillar["id"],
                 "pillar_name": pillar["name"],
                 "patient_score": _round(_to_float(pillar["score"])),
+                "patient_score_label": pillar.get(
+                    "score_label",
+                    _score_label(_to_float(pillar["score"]), "high"),
+                ),
                 "peer_score": peer_score,
+                "peer_score_label": f"{peer_score:.0f}",
                 "difference": _round(_to_float(pillar["score"]) - peer_score),
+                "has_enough_data": pillar.get("has_enough_data", True),
+                "score_confidence": pillar.get("score_confidence", "high"),
             }
         )
 
@@ -426,7 +540,12 @@ def _weekly_actions_for_pillar(pillar_id: str, profile: Dict) -> List[Dict]:
     return action_map[pillar_id]
 
 
-def _recommended_offer(primary_focus: Dict, offers: List[Dict]) -> Optional[Dict]:
+def _recommended_offer(primary_focus: Dict, offers: List[Dict], flags: List[Dict]) -> Optional[Dict]:
+    if any(flag.get("severity") == "high" for flag in flags):
+        for offer in offers:
+            if offer.get("priority") == 1:
+                return offer
+
     pillar_offer_preference = {
         "sleep_recovery": {"sleep_recovery_package"},
         "cardiovascular_health": {"preventive_cardiometabolic_panel"},
@@ -451,8 +570,12 @@ def build_compass(bundle: Dict) -> Dict:
         bundle.get("age_peers", []),
     )
     overall_direction = _overall_direction(pillars)
-    primary_focus = _choose_primary_focus(pillars)
-    recommended_offer = _recommended_offer(primary_focus, bundle.get("offers", []))
+    primary_focus = _choose_primary_focus(pillars, profile)
+    recommended_offer = _recommended_offer(
+        primary_focus,
+        bundle.get("offers", []),
+        bundle.get("flags", []),
+    )
     return _normalize(
         {
             "patient_id": profile["patient_id"],
@@ -506,8 +629,7 @@ def build_coach_snapshot(bundle: Dict) -> Dict:
             "intro": (
                 f"I already have your watch trends and your doctor context on file. "
                 f"Right now, {focus} is the most important area to work on first. "
-                f"{care_context['last_appointment_summary']} "
-                f"{data_coverage['tailoring_note']}"
+                f"{care_context['last_appointment_summary']}"
             ),
             "suggested_prompts": [
                 "Summarize what you already know about me.",

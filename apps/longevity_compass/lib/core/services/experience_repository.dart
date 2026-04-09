@@ -4,6 +4,7 @@ import '../firebase/firebase_session_service.dart';
 import '../firebase/firestore_chat_service.dart';
 import '../models/experience_models.dart';
 import 'api_client.dart';
+import 'local_coach_reply_service.dart';
 
 class ExperienceRepository {
   ExperienceRepository({
@@ -11,17 +12,21 @@ class ExperienceRepository {
     FirestoreExperienceService? firestoreExperienceService,
     FirestoreChatService? firestoreChatService,
     FirebaseSessionService? firebaseSessionService,
+    LocalCoachReplyService? localCoachReplyService,
   })  : _apiClient = apiClient ?? ApiClient(),
         _firestoreExperienceService =
             firestoreExperienceService ?? FirestoreExperienceService(),
         _firestoreChatService = firestoreChatService ?? FirestoreChatService(),
         _firebaseSessionService =
-            firebaseSessionService ?? FirebaseSessionService.instance;
+            firebaseSessionService ?? FirebaseSessionService.instance,
+        _localCoachReplyService =
+            localCoachReplyService ?? const LocalCoachReplyService();
 
   final ApiClient _apiClient;
   final FirestoreExperienceService _firestoreExperienceService;
   final FirestoreChatService _firestoreChatService;
   final FirebaseSessionService _firebaseSessionService;
+  final LocalCoachReplyService _localCoachReplyService;
 
   Future<List<PatientListItem>> fetchPatients() async {
     if (AppConfig.enableFirebase) {
@@ -49,7 +54,18 @@ class ExperienceRepository {
     return ExperienceSnapshot.fromJson(response);
   }
 
-  Future<CoachReply> sendCoachMessage(String patientId, String message) async {
+  Future<CoachReply> sendCoachMessage(
+    String patientId,
+    String message, {
+    ExperienceSnapshot? experience,
+  }) async {
+    if (AppConfig.enableFirebase && experience != null) {
+      return _localCoachReplyService.buildReply(
+        experience: experience,
+        message: message,
+      );
+    }
+
     final response = await _apiClient.postJson(
       '/patients/$patientId/coach/reply',
       {'message': message},
