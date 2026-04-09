@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -26,10 +26,15 @@ def _get_or_init_app() -> firebase_admin.App:
     return firebase_admin.initialize_app(options={"projectId": project_id})
 
 
+def get_firestore_client() -> firestore.Client:
+    """Return a Firestore client with initialized Firebase app."""
+    _get_or_init_app()
+    return firestore.client()
+
+
 def push_test_message(message: str) -> Dict[str, Any]:
     """Write a test payload to Firestore and return metadata about the write."""
-    _get_or_init_app()
-    client = firestore.client()
+    client = get_firestore_client()
     doc_ref = client.collection("agent_test_messages").document()
 
     payload = {
@@ -44,4 +49,30 @@ def push_test_message(message: str) -> Dict[str, Any]:
         "collection": "agent_test_messages",
         "document_id": doc_ref.id,
         "project_id": os.getenv("FIREBASE_PROJECT_ID", "longevity-compass-firestore"),
+    }
+
+
+def get_patient_firebase_context(patient_id: str) -> Dict[str, Any]:
+    """Fetch patient-specific context from common Firestore collections."""
+    client = get_firestore_client()
+    collections: List[str] = [
+        "patients",
+        "patient_profiles",
+        "coach_context",
+        "goals",
+        "care_plans",
+    ]
+    data: Dict[str, Any] = {}
+
+    for collection_name in collections:
+        snapshot = client.collection(collection_name).document(patient_id).get()
+        if snapshot.exists:
+            data[collection_name] = snapshot.to_dict()
+
+    return {
+        "patient_id": patient_id,
+        "project_id": os.getenv("FIREBASE_PROJECT_ID", "longevity-compass-firestore"),
+        "collections_checked": collections,
+        "collections_found": list(data.keys()),
+        "data": data,
     }
