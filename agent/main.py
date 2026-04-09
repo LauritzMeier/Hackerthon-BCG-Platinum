@@ -8,12 +8,20 @@ from typing import Any, Dict
 from dotenv import load_dotenv
 from google.adk.agents import Agent
 
-from firebase_client import push_test_message
-from pillar_analysis import (
-    analyze_patient_six_pillars,
-    explain_single_pillar,
-    generate_tailored_explanation,
-)
+try:
+    from .firebase_client import push_test_message
+    from .pillar_analysis import (
+        analyze_patient_six_pillars,
+        explain_single_pillar,
+        generate_tailored_explanation,
+    )
+except ImportError:  # pragma: no cover - fallback for direct script execution
+    from firebase_client import push_test_message
+    from pillar_analysis import (
+        analyze_patient_six_pillars,
+        explain_single_pillar,
+        generate_tailored_explanation,
+    )
 
 load_dotenv(".env.local")
 load_dotenv()

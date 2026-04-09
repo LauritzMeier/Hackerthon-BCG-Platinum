@@ -1,3 +1,6 @@
+import json
+
+import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -46,6 +49,36 @@ def _require_bundle(patient_id: str):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/agent/health-proxy")
+async def get_agent_health_proxy(target: str = Query(..., min_length=1)):
+    target_url = target.rstrip("/")
+    upstream_url = f"{target_url}/health"
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            upstream = await client.get(
+                upstream_url,
+                headers={"Accept": "application/json"},
+            )
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Agent health upstream request failed: {exc}",
+        ) from exc
+
+    body_text = upstream.text
+    try:
+        body = upstream.json()
+    except json.JSONDecodeError:
+        body = body_text
+
+    return {
+        "upstream_url": upstream_url,
+        "status_code": upstream.status_code,
+        "body": body,
+    }
 
 
 @app.get("/patients")

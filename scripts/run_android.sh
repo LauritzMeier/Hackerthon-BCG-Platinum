@@ -9,6 +9,7 @@ MODE="auto"
 DEVICE_ID="${ANDROID_DEVICE_ID:-}"
 EMULATOR_ID="${ANDROID_EMULATOR_ID:-$DEFAULT_ANDROID_EMULATOR_ID}"
 API_BASE_URL="${APP_API_BASE_URL:-}"
+AGENT_BASE_URL="${APP_AGENT_BASE_URL:-}"
 ENABLE_FIREBASE="${APP_ENABLE_FIREBASE:-auto}"
 FIREBASE_PROJECT_ID_FLAG="${FIREBASE_PROJECT_ID:-}"
 FIRESTORE_DATABASE_ID="${FIRESTORE_DATABASE_ID:-}"
@@ -31,6 +32,7 @@ Options:
   --device-id ID                Use a specific Android device id.
   --emulator-id ID              Use a specific emulator id.
   --api-base-url URL            Override the API base URL.
+  --agent-base-url URL          Override the agent base URL used for /chat/stream.
   --firebase-project PROJECT    Configure Firebase before launch and enable it.
   --enable-firebase             Enable Firebase if config is present.
   --no-firebase                 Disable Firebase even if config is present.
@@ -65,6 +67,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --api-base-url)
       API_BASE_URL="$2"
+      shift 2
+      ;;
+    --agent-base-url)
+      AGENT_BASE_URL="$2"
       shift 2
       ;;
     --firebase-project)
@@ -171,6 +177,10 @@ CMD=(
   --dart-define=APP_API_BASE_URL="$API_BASE_URL"
 )
 
+if [[ -n "$AGENT_BASE_URL" ]]; then
+  CMD+=(--dart-define=APP_AGENT_BASE_URL="$AGENT_BASE_URL")
+fi
+
 if [[ "$ENABLE_FIREBASE" == "true" ]]; then
   CMD+=(--dart-define=APP_ENABLE_FIREBASE=true)
 fi
@@ -185,6 +195,7 @@ fi
 
 log "Target Android device: ${TARGET_DEVICE_ID}"
 log "API base URL: ${API_BASE_URL}"
+log "Agent base URL: ${AGENT_BASE_URL:-"(not set)"}"
 log "Firebase enabled: ${ENABLE_FIREBASE}"
 log "Firestore database: ${FIRESTORE_DATABASE_ID:-"(default)"}"
 

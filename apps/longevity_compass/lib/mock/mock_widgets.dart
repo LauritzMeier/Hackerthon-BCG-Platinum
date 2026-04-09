@@ -227,9 +227,16 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final alignment =
         message.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-    final bubbleColor =
-        message.isUser ? AppPalette.ink : Colors.white.withValues(alpha: 0.86);
-    final foreground = message.isUser ? Colors.white : AppPalette.ink;
+    final bubbleColor = message.isUser
+        ? AppPalette.ink
+        : message.isError
+            ? const Color(0xFFF5E1DB)
+            : Colors.white.withValues(alpha: 0.86);
+    final foreground = message.isUser
+        ? Colors.white
+        : message.isError
+            ? AppPalette.wine
+            : AppPalette.ink;
 
     return Column(
       crossAxisAlignment: alignment,
@@ -253,7 +260,9 @@ class MessageBubble extends StatelessWidget {
         Text(
           message.timeLabel,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppPalette.ink.withValues(alpha: 0.48),
+                color: message.isError
+                    ? AppPalette.wine.withValues(alpha: 0.72)
+                    : AppPalette.ink.withValues(alpha: 0.48),
                 fontWeight: FontWeight.w700,
               ),
         ),

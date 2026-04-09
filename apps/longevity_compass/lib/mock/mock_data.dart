@@ -83,11 +83,27 @@ class MockMessage {
     required this.text,
     required this.timeLabel,
     required this.isUser,
+    this.isError = false,
   });
 
   final String text;
   final String timeLabel;
   final bool isUser;
+  final bool isError;
+
+  MockMessage copyWith({
+    String? text,
+    String? timeLabel,
+    bool? isUser,
+    bool? isError,
+  }) {
+    return MockMessage(
+      text: text ?? this.text,
+      timeLabel: timeLabel ?? this.timeLabel,
+      isUser: isUser ?? this.isUser,
+      isError: isError ?? this.isError,
+    );
+  }
 }
 
 class FutureTimelineEntry {

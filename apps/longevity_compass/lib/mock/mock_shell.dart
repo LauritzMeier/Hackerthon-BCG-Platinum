@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../app/app_theme.dart';
+import '../core/config/app_config.dart';
+import '../core/services/agent_chat_service.dart';
 import 'mock_data.dart';
 import 'mock_widgets.dart';
 
@@ -139,8 +141,10 @@ class ChatMockScreen extends StatefulWidget {
 class _ChatMockScreenState extends State<ChatMockScreen> {
   late List<MockConversation> _conversations;
   late String _selectedConversationId;
+  final AgentChatService _chatService = AgentChatService();
   final TextEditingController _composerController = TextEditingController();
   bool _historyOpen = false;
+  bool _isSending = false;
 
   @override
   void initState() {
@@ -157,45 +161,108 @@ class _ChatMockScreenState extends State<ChatMockScreen> {
 
   @override
   void dispose() {
+    _chatService.dispose();
     _composerController.dispose();
     super.dispose();
   }
 
-  void _sendMockMessage() {
-    _commitMockMessage(_composerController.text.trim());
-  }
+  Future<void> _sendAgentMessage([String? seededText]) async {
+    if (_isSending) {
+      return;
+    }
 
-  void _commitMockMessage(String text) {
+    final text = (seededText ?? _composerController.text).trim();
     if (text.isEmpty) {
       return;
     }
 
     _composerController.clear();
-    final selected = _conversationById(_selectedConversationId);
-    final updatedMessages = [
-      ...selected.messages,
-      MockMessage(text: text, timeLabel: 'now', isUser: true),
-      const MockMessage(
-        text:
-            'Mockup reply: this stays frontend-only for now, but the layout is already shaped for an LLM-style assistant response.',
-        timeLabel: 'preview',
-        isUser: false,
-      ),
-    ];
+    final conversationId = _selectedConversationId;
+    final selected = _conversationById(conversationId);
     final updatedConversation = selected.copyWith(
       label: _updatedConversationLabel(selected.label, text),
       preview: text,
       updatedLabel: 'now',
-      messages: updatedMessages,
+      messages: [
+        ...selected.messages,
+        MockMessage(
+          text: text,
+          timeLabel: _nowLabel(),
+          isUser: true,
+        ),
+        const MockMessage(
+          text: 'Connecting to agent on /chat/stream...',
+          timeLabel: 'sending',
+          isUser: false,
+        ),
+      ],
     );
 
+    _replaceConversation(updatedConversation);
     setState(() {
-      _conversations = [
-        updatedConversation,
-        ..._conversations
-            .where((conversation) => conversation.id != selected.id),
-      ];
+      _isSending = true;
     });
+
+    final buffer = StringBuffer();
+    var receivedText = false;
+
+    try {
+      await for (final event in _chatService.streamReply(
+        message: text,
+        patientId: AppConfig.demoPatientId,
+      )) {
+        if (!mounted) {
+          return;
+        }
+
+        if (event.isDone) {
+          break;
+        }
+
+        receivedText = true;
+        buffer.write(event.text);
+        _updateAssistantMessage(
+          conversationId,
+          text: buffer.toString().trimRight(),
+          timeLabel: 'live',
+        );
+      }
+
+      _updateAssistantMessage(
+        conversationId,
+        text: receivedText
+            ? _normalizeAgentReply(buffer.toString())
+            : 'Agent returned no visible content.',
+        timeLabel: 'agent',
+      );
+    } on AgentChatException catch (error) {
+      final statusLabel = error.statusCode == null
+          ? 'network'
+          : 'HTTP ${error.statusCode}';
+      final message = error.statusCode == null
+          ? error.message
+          : 'Agent error ${error.statusCode}: ${error.message}';
+      _updateAssistantMessage(
+        conversationId,
+        text: message,
+        timeLabel: statusLabel,
+        isError: true,
+      );
+    } catch (error) {
+      _updateAssistantMessage(
+        conversationId,
+        text: 'Agent request failed: $error',
+        timeLabel: 'error',
+        isError: true,
+      );
+    } finally {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSending = false;
+      });
+    }
   }
 
   void _toggleHistory() {
@@ -238,6 +305,49 @@ class _ChatMockScreenState extends State<ChatMockScreen> {
     return _conversations.firstWhere((conversation) => conversation.id == id);
   }
 
+  void _replaceConversation(MockConversation conversation) {
+    setState(() {
+      _conversations = [
+        conversation,
+        ..._conversations
+            .where((entry) => entry.id != conversation.id),
+      ];
+    });
+  }
+
+  void _updateAssistantMessage(
+    String conversationId, {
+    required String text,
+    required String timeLabel,
+    bool isError = false,
+  }) {
+    final conversation = _conversationById(conversationId);
+    final messages = List<MockMessage>.from(conversation.messages);
+    if (messages.isEmpty || messages.last.isUser) {
+      messages.add(
+        MockMessage(
+          text: text,
+          timeLabel: timeLabel,
+          isUser: false,
+          isError: isError,
+        ),
+      );
+    } else {
+      messages[messages.length - 1] = messages.last.copyWith(
+        text: text,
+        timeLabel: timeLabel,
+        isError: isError,
+      );
+    }
+
+    _replaceConversation(
+      conversation.copyWith(
+        messages: messages,
+        updatedLabel: 'now',
+      ),
+    );
+  }
+
   String _updatedConversationLabel(String currentLabel, String message) {
     if (currentLabel != 'New chat') {
       return currentLabel;
@@ -257,6 +367,17 @@ class _ChatMockScreenState extends State<ChatMockScreen> {
         label.contains('m ago') ||
         label.contains('h ago') ||
         label == 'yesterday';
+  }
+
+  String _normalizeAgentReply(String value) {
+    return value
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .replaceAll(RegExp(r'[ \t]+\n'), '\n')
+        .trim();
+  }
+
+  String _nowLabel() {
+    return TimeOfDay.now().format(context);
   }
 
   @override
@@ -309,7 +430,7 @@ class _ChatMockScreenState extends State<ChatMockScreen> {
                                     ])
                                       _ChatPromptChip(
                                         label: prompt,
-                                        onTap: () => _commitMockMessage(prompt),
+                                        onTap: () => _sendAgentMessage(prompt),
                                       ),
                                   ],
                                 ),
@@ -347,22 +468,24 @@ class _ChatMockScreenState extends State<ChatMockScreen> {
                                 Expanded(
                                   child: TextField(
                                     controller: _composerController,
+                                    enabled: !_isSending,
                                     minLines: 1,
                                     maxLines: 4,
                                     decoration: const InputDecoration(
-                                      hintText: 'Message the mock companion...',
+                                      hintText: 'Message the agent companion...',
                                       border: InputBorder.none,
                                       enabledBorder: InputBorder.none,
                                       focusedBorder: InputBorder.none,
                                       filled: false,
                                       contentPadding: EdgeInsets.zero,
                                     ),
-                                    onSubmitted: (_) => _sendMockMessage(),
+                                    onSubmitted: (_) => _sendAgentMessage(),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 FilledButton(
-                                  onPressed: _sendMockMessage,
+                                  onPressed:
+                                      _isSending ? null : _sendAgentMessage,
                                   style: FilledButton.styleFrom(
                                     backgroundColor: AppPalette.ink,
                                     foregroundColor: Colors.white,

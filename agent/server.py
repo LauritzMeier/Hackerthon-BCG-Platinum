@@ -7,15 +7,27 @@ import json
 from typing import AsyncGenerator, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from main import analyze_six_pillars, build_tailored_explanation, explain_pillar
+try:
+    from .main import analyze_six_pillars, build_tailored_explanation, explain_pillar
+except ImportError:  # pragma: no cover - fallback for direct script execution
+    from main import analyze_six_pillars, build_tailored_explanation, explain_pillar
 
 app = FastAPI(
     title="Longevity ADK Agent Server",
     version="0.1.0",
     description="Single central chat API with SSE streaming and pillar-aware routing.",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

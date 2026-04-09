@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 import firebase_admin
+from google.auth.exceptions import DefaultCredentialsError
 from firebase_admin import credentials, firestore
 
 
@@ -54,7 +55,6 @@ def push_test_message(message: str) -> Dict[str, Any]:
 
 def get_patient_firebase_context(patient_id: str) -> Dict[str, Any]:
     """Fetch patient-specific context from common Firestore collections."""
-    client = get_firestore_client()
     collections: List[str] = [
         "patients",
         "patient_profiles",
@@ -62,6 +62,20 @@ def get_patient_firebase_context(patient_id: str) -> Dict[str, Any]:
         "goals",
         "care_plans",
     ]
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:  # pylint: disable=broad-except
+        return {
+            "patient_id": patient_id,
+            "project_id": os.getenv("FIREBASE_PROJECT_ID", "longevity-compass-firestore"),
+            "collections_checked": collections,
+            "collections_found": [],
+            "data": {},
+            "firebase_available": False,
+            "warning": _firebase_unavailable_reason(exc),
+        }
+
     data: Dict[str, Any] = {}
 
     for collection_name in collections:
@@ -75,4 +89,11 @@ def get_patient_firebase_context(patient_id: str) -> Dict[str, Any]:
         "collections_checked": collections,
         "collections_found": list(data.keys()),
         "data": data,
+        "firebase_available": True,
     }
+
+
+def _firebase_unavailable_reason(exc: Exception) -> str:
+    if isinstance(exc, DefaultCredentialsError):
+        return "Application Default Credentials are not configured."
+    return str(exc)

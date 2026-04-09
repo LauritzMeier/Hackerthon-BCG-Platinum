@@ -8,6 +8,7 @@ source "$SCRIPT_DIR/_app_env.sh"
 DEVICE_ID="${IOS_DEVICE_ID:-}"
 SIMULATOR_ID="${IOS_SIMULATOR_ID:-$DEFAULT_IOS_EMULATOR_ID}"
 API_BASE_URL="${APP_API_BASE_URL:-http://127.0.0.1:8000}"
+AGENT_BASE_URL="${APP_AGENT_BASE_URL:-}"
 ENABLE_FIREBASE="${APP_ENABLE_FIREBASE:-auto}"
 FIREBASE_PROJECT_ID_FLAG="${FIREBASE_PROJECT_ID:-}"
 FIRESTORE_DATABASE_ID="${FIRESTORE_DATABASE_ID:-}"
@@ -28,6 +29,7 @@ Options:
   --device-id ID                Use a specific iOS device id instead of the simulator default.
   --simulator-id ID             Launch a specific Flutter iOS simulator id.
   --api-base-url URL            Override the API base URL.
+  --agent-base-url URL          Override the agent base URL used for /chat/stream.
   --firebase-project PROJECT    Configure Firebase before launch and enable it.
   --enable-firebase             Enable Firebase if config is present.
   --no-firebase                 Disable Firebase even if config is present.
@@ -53,6 +55,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --api-base-url)
       API_BASE_URL="$2"
+      shift 2
+      ;;
+    --agent-base-url)
+      AGENT_BASE_URL="$2"
       shift 2
       ;;
     --firebase-project)
@@ -140,6 +146,10 @@ CMD=(
   --dart-define=APP_API_BASE_URL="$API_BASE_URL"
 )
 
+if [[ -n "$AGENT_BASE_URL" ]]; then
+  CMD+=(--dart-define=APP_AGENT_BASE_URL="$AGENT_BASE_URL")
+fi
+
 if [[ "$ENABLE_FIREBASE" == "true" ]]; then
   CMD+=(--dart-define=APP_ENABLE_FIREBASE=true)
 fi
@@ -154,6 +164,7 @@ fi
 
 log "Target iOS device: ${TARGET_DEVICE_ID}"
 log "API base URL: ${API_BASE_URL}"
+log "Agent base URL: ${AGENT_BASE_URL:-"(not set)"}"
 log "Firebase enabled: ${ENABLE_FIREBASE}"
 log "Firestore database: ${FIRESTORE_DATABASE_ID:-"(default)"}"
 
