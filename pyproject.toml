@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "longevity-mvp"
+version = "0.1.0"
+description = "Local-first data foundation for the BCG Platinion longevity MVP challenge."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "duckdb>=1.1.0",
+  "fastapi>=0.110.0",
+  "uvicorn>=0.29.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/longevity_mvp"]

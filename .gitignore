@@ -1,0 +1,10 @@
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+
+data/warehouse/*
+!data/warehouse/.gitkeep
+
+data/exports/*
+!data/exports/.gitkeep
