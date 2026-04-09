@@ -14,6 +14,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
+from .coach_voice import (
+    compose_general_sections,
+    compose_pillar_sections,
+    compose_priority_sections,
+    compose_tailored_sections,
+    firebase_context_line,
+    safety_footers,
+)
 from .firebase_client import get_patient_firebase_context, get_runtime_diagnostics
 from .main import analyze_six_pillars, build_tailored_explanation, explain_pillar
 
@@ -71,6 +79,17 @@ PRIORITY_INTENT_KEYWORDS = {
         "struggling",
         "biggest issue",
         "main problem",
+        "burning out",
+        "burnout",
+        "worried",
+        "worry about",
+        "concerned",
+        "slipping",
+        "warning signs",
+        "what am i missing",
+        "afraid of",
+        "riskiest",
+        "vulnerable",
     ],
     "strength": [
         "strength",
@@ -78,6 +97,11 @@ PRIORITY_INTENT_KEYWORDS = {
         "best",
         "doing well",
         "relative strength",
+        "bright spot",
+        "what am i good at",
+        "where am i strong",
+        "winning",
+        "what is working",
     ],
     "deprioritize": [
         "shouldnt focus",
@@ -92,6 +116,12 @@ PRIORITY_INTENT_KEYWORDS = {
         "deprioritize",
         "ignore",
         "focus less",
+        "dont obsess",
+        "don't obsess",
+        "stop worrying",
+        "worry less about",
+        "not worth obsessing",
+        "overthinking",
     ],
     "priority": [
         "top focus",
@@ -101,6 +131,22 @@ PRIORITY_INTENT_KEYWORDS = {
         "focus on",
         "main focus",
         "biggest risk",
+        "this week",
+        "where do i start",
+        "what should i work on",
+        "help me prioritize",
+        "on track",
+        "biggest lever",
+        "one thing",
+        "first step",
+        "coach me",
+        "what matters most",
+        "explain my",
+        "guide me",
+        "too busy",
+        "no time",
+        "simplest",
+        "straightforward",
     ],
 }
 
@@ -122,6 +168,7 @@ def _is_pillar_related(message: str) -> bool:
     generic_signals = [
         "pillar",
         "longevity",
+        "healthspan",
         "analyze",
         "analysis",
         "score",
@@ -133,6 +180,22 @@ def _is_pillar_related(message: str) -> bool:
         "strongest",
         "priority",
         "compass",
+        "independence",
+        "energy",
+        "prevention",
+        "optimize",
+        "overwhelmed",
+        "sustainable",
+        "routine",
+        "habit",
+        "recovery",
+        "burnout",
+        "stress",
+        "credibility",
+        "trust",
+        "data driven",
+        "measurable",
+        "roi",
     ]
     return any(token in lower_message for token in generic_signals) or _extract_target_pillar(message) is not None
 
@@ -155,8 +218,8 @@ def _sorted_pillars_by_priority(analysis: Dict[str, Any]) -> List[Dict[str, Any]
 def _compose_priority_answer(message: str, analysis: Dict[str, Any]) -> List[str]:
     if not analysis.get("ok"):
         return [
-            "I could not load enough patient data yet. Please confirm the patient id and data availability.",
-            "Uncertainty note: this guidance cannot be personalized until data loads successfully.",
+            "I couldn't pull enough structured data for this patient id yet — double-check the id and that records synced.",
+            "Until the warehouse loads, I can't personalize this; treat anything generic as placeholder.",
         ]
 
     ranked = _sorted_pillars_by_priority(analysis)
@@ -165,117 +228,26 @@ def _compose_priority_answer(message: str, analysis: Dict[str, Any]) -> List[str
     strongest = max(analysis["pillars"], key=lambda pillar: pillar["score"])
     intent = _extract_priority_intent(message) or "priority"
 
-    if intent == "weakness":
-        sections = [
-            f"Your biggest weakness right now is {weakest['name']}.",
-            (
-                f"It has the lowest priority-adjusted profile: score {weakest['score']} with a "
-                f"{weakest['trend']} trend. The main signals are {weakest['key_signals']}."
-            ),
-            (
-                f"This is why the app should focus here first, before {next_weakest['name']} or the stronger pillars."
-            ),
-        ]
-    elif intent == "strength":
-        sections = [
-            f"Your strongest pillar right now is {strongest['name']}.",
-            (
-                f"It is currently the most resilient area: score {strongest['score']} with a "
-                f"{strongest['trend']} trend. The main signals are {strongest['key_signals']}."
-            ),
-            "That means this pillar should be maintained, not over-managed.",
-        ]
-    elif intent == "deprioritize":
-        sections = [
-            f"What should not be your main focus right now is {strongest['name']}.",
-            (
-                f"It is currently your strongest area with score {strongest['score']} and trend "
-                f"{strongest['trend']}, so it needs maintenance more than urgent attention."
-            ),
-            (
-                f"The app should prioritize {weakest['name']} instead, because that is the biggest current drag on your overall trajectory."
-            ),
-        ]
-    else:
-        sections = [
-            f"Your main focus right now should be {weakest['name']}.",
-            (
-                f"It has the weakest score and trend combination: score {weakest['score']}, trend "
-                f"{weakest['trend']}, with key signals {weakest['key_signals']}."
-            ),
-            (
-                f"What should get less attention for now is {strongest['name']}, which is comparatively stronger at score {strongest['score']}."
-            ),
-        ]
-
-    sections.append(f"Context note: {analysis['firebase_context_summary']}")
-    sections.append(
-        "Safety note: this is wellness coaching support and not a diagnosis."
-    )
+    sections = compose_priority_sections(intent, weakest, strongest, next_weakest)
+    sections.append(firebase_context_line(analysis["firebase_context_summary"]))
+    sections.extend(safety_footers())
     return sections
 
 
 def _compose_from_tailored(payload: Dict) -> List[str]:
-    context = payload["context"]
-    claims = payload.get("claims", [])
-    trade_offs = payload.get("trade_offs", [])
-    actions = payload.get("next_best_actions", [])
-
-    sections: List[str] = []
-    sections.append(
-        (
-            f"Current direction is {context['overall_direction']} with average score "
-            f"{context['average_score']}. {context['firebase_context_summary']}"
-        )
-    )
-
-    for idx, claim in enumerate(claims, start=1):
-        ev = claim["evidence"][0]
-        sections.append(
-            (
-                f"Claim {idx}: {claim['claim']} Why: {claim['why']} "
-                f"Evidence -> {ev['pillar_id']} score {ev['score']}, trend {ev['trend']}, "
-                f"signals {ev['key_signals']}."
-            )
-        )
-
-    for idx, trade_off in enumerate(trade_offs, start=1):
-        sections.append(f"Trade-off {idx}: {trade_off['topic']}. {trade_off['detail']}")
-
-    for idx, action in enumerate(actions, start=1):
-        sections.append(
-            f"Next action {idx}: {action['action']} Why: {action['why']} Evidence: {action['evidence']}."
-        )
-
-    sections.append(
-        "Uncertainty note: this is wellness coaching guidance from available records; "
-        "missing or delayed data can change interpretation."
-    )
-    sections.append(
-        "Safety note: this is not a diagnosis. If risk signals are elevated, seek clinician follow-up."
-    )
-    return sections
+    return compose_tailored_sections(payload)
 
 
 def _compose_general_chat(message: str, patient_id: str) -> List[str]:
     analysis = build_tailored_explanation(patient_id)
     if not analysis.get("ok"):
         return [
-            "I could not load enough patient data yet. Please confirm the patient id and data availability.",
-            "Uncertainty note: this guidance cannot be personalized until data loads successfully.",
+            "I couldn't load a full picture for that patient id — worth verifying the id and data pipeline.",
+            "Once records are in, I can answer in a much more personal tone.",
         ]
 
     focus = analysis["claims"][0]["evidence"][0]
-    return [
-        f"You asked: {message}",
-        (
-            "I can help with your central longevity chat and pull pillar analysis when relevant. "
-            f"For {patient_id}, the current top focus is {focus['pillar_id']} "
-            f"(score {focus['score']}, trend {focus['trend']})."
-        ),
-        "Ask me to explain any pillar, compare pillars, or recommend next-best actions.",
-        "Safety note: this is wellness coaching support and not a diagnosis.",
-    ]
+    return compose_general_sections(message, patient_id, focus)
 
 
 def _extract_debug_payload(source_payload: Dict[str, Any], request: ChatRequest) -> Dict[str, Any]:
@@ -345,17 +317,7 @@ def _build_chat_sections(request: ChatRequest) -> Dict[str, object]:
                 raise HTTPException(status_code=404, detail=pillar_payload.get("error", "analysis failed"))
             pillar = pillar_payload["pillar"]
             source_payload = pillar_payload
-            sections = [
-                f"Here is your {pillar['name']} update.",
-                (
-                    f"State: {pillar['state']}, trend: {pillar['trend']}, score: {pillar['score']}. "
-                    f"Explanation: {pillar['explanation']}"
-                ),
-                f"Evidence: {pillar['key_signals']} (sources: {pillar['data_sources']}).",
-                f"Context note: {pillar_payload['firebase_context_summary']}",
-                "Uncertainty note: interpretation can shift if new data arrives.",
-                "Safety note: this is not a diagnosis; follow up with a clinician for clinical decisions.",
-            ]
+            sections = compose_pillar_sections(pillar, pillar_payload["firebase_context_summary"])
             evidence_index = {pillar["id"]: pillar}
         else:
             tailored = build_tailored_explanation(patient_id)
