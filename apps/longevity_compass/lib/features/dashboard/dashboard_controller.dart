@@ -5,12 +5,20 @@ import '../../core/models/experience_models.dart';
 import '../../core/services/experience_repository.dart';
 
 class DashboardController extends ChangeNotifier {
+  static const Map<String, String> _loginAliases = <String, String>{
+    'patient0': 'PT0000',
+    'patient1': 'PT0001',
+    'pt0000': 'PT0000',
+    'pt0001': 'PT0001',
+  };
+
   DashboardController({
     required ExperienceRepository repository,
   }) : _repository = repository;
 
   final ExperienceRepository _repository;
 
+  bool hasBootstrapped = false;
   bool isLoading = false;
   bool isSendingMessage = false;
   String? errorMessage;
@@ -22,6 +30,7 @@ class DashboardController extends ChangeNotifier {
   String? selectedPatientId;
   String? firebaseUserId;
   String? firestoreStatusMessage;
+  int _loginSequence = 0;
 
   Future<void> load() async {
     isLoading = true;
@@ -31,8 +40,7 @@ class DashboardController extends ChangeNotifier {
     try {
       await _initializeFirebaseSession();
       patients = await _repository.fetchPatients();
-      selectedPatientId = _resolveInitialPatientId();
-      await _loadCurrentExperience();
+      hasBootstrapped = true;
     } catch (error) {
       errorMessage = error.toString();
     } finally {
@@ -62,12 +70,7 @@ class DashboardController extends ChangeNotifier {
   }
 
   Future<void> selectPatient(String patientId) async {
-    if (selectedPatientId == patientId) {
-      return;
-    }
-
-    selectedPatientId = patientId;
-    await refresh();
+    await _activatePatient(patientId);
   }
 
   Future<void> sendCoachMessage(String message) async {
@@ -111,7 +114,9 @@ class DashboardController extends ChangeNotifier {
     } catch (error) {
       errorMessage = error.toString();
       final fallbackMessage = ChatMessage.assistant(
-        'I saved your note, but I could not shape a useful reply from your current context just now.',
+        usesLiveAgent
+            ? 'I saved your note, but I could not reach the live coach just now. Please try again.'
+            : 'I saved your note, but I could not shape a useful reply from your current context just now.',
       );
       chatMessages = <ChatMessage>[...chatMessages, fallbackMessage];
 
@@ -128,6 +133,10 @@ class DashboardController extends ChangeNotifier {
 
   bool get isFirebaseEnabled => _repository.isFirebaseEnabled;
 
+  bool get usesLiveAgent => _repository.shouldUseLiveAgentFor(customerProfile);
+
+  bool get isLoggedIn => selectedPatientId != null && experience != null;
+
   bool get isWelcomeJourney => customerProfile?.isWelcomeJourney ?? false;
 
   bool get hasStartedOnboarding =>
@@ -138,6 +147,70 @@ class DashboardController extends ChangeNotifier {
       isWelcomeJourney &&
       !hasStartedOnboarding &&
       (customerProfile?.disconnectedSources.isNotEmpty ?? false);
+
+  int get loginSequence => _loginSequence;
+
+  List<String> get supportedLoginUsernames =>
+      _loginAliases.keys.where((value) => value.startsWith('patient')).toList();
+
+  String get selectedUsername =>
+      usernameForPatientId(selectedPatientId) ?? 'patient1';
+
+  String? usernameForPatientId(String? patientId) {
+    if (patientId == null) {
+      return null;
+    }
+    for (final entry in _loginAliases.entries) {
+      if (entry.value == patientId && entry.key.startsWith('patient')) {
+        return entry.key;
+      }
+    }
+    return null;
+  }
+
+  String? patientIdForUsername(String username) {
+    final normalized = username.toLowerCase().replaceAll(
+          RegExp(r'[\s_-]+'),
+          '',
+        );
+    return _loginAliases[normalized];
+  }
+
+  bool hasPatient(String patientId) {
+    return patients.any((patient) => patient.patientId == patientId);
+  }
+
+  Future<bool> loginWithUsername(String username) async {
+    final normalized = username.toLowerCase().replaceAll(
+          RegExp(r'[\s_-]+'),
+          '',
+        );
+    final patientId = patientIdForUsername(username);
+    if (patientId == null) {
+      errorMessage = 'Use `patient0` or `patient1` to log in.';
+      notifyListeners();
+      return false;
+    }
+
+    if (!hasPatient(patientId)) {
+      errorMessage =
+          '`${usernameForPatientId(patientId) ?? normalized}` is not available in this build yet.';
+      notifyListeners();
+      return false;
+    }
+
+    return _activatePatient(patientId);
+  }
+
+  void logout() {
+    selectedPatientId = null;
+    experience = null;
+    customerProfile = null;
+    supportBookings = <SupportBooking>[];
+    chatMessages = <ChatMessage>[];
+    errorMessage = null;
+    notifyListeners();
+  }
 
   String get firestoreMessagesPath {
     final patientId = selectedPatientId ?? '<patient-id>';
@@ -244,15 +317,31 @@ class DashboardController extends ChangeNotifier {
     firestoreStatusMessage = result.statusMessage;
   }
 
-  String _resolveInitialPatientId() {
-    if (patients
-        .any((patient) => patient.patientId == _repository.defaultPatientId)) {
-      return _repository.defaultPatientId;
+  Future<bool> _activatePatient(String patientId) async {
+    if (selectedPatientId == patientId && experience != null) {
+      return true;
     }
-    if (patients.isNotEmpty) {
-      return patients.first.patientId;
+
+    isLoading = true;
+    errorMessage = null;
+    selectedPatientId = patientId;
+    _loginSequence += 1;
+    notifyListeners();
+
+    try {
+      await _loadCurrentExperience();
+      return true;
+    } catch (error) {
+      errorMessage = error.toString();
+      experience = null;
+      customerProfile = null;
+      supportBookings = <SupportBooking>[];
+      chatMessages = <ChatMessage>[];
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
     }
-    return _repository.defaultPatientId;
   }
 
   Future<void> _loadCurrentExperience() async {
@@ -267,12 +356,11 @@ class DashboardController extends ChangeNotifier {
       experience: experience,
     );
     supportBookings = await _repository.fetchSupportBookings(patientId);
-    final storedMessages = await _repository.fetchChatMessages(patientId);
-    chatMessages = storedMessages.isNotEmpty
-        ? storedMessages
-        : <ChatMessage>[
+    chatMessages = (customerProfile?.isWelcomeJourney ?? false)
+        ? <ChatMessage>[
             ChatMessage.assistant(experience!.coach.intro),
-          ];
+          ]
+        : <ChatMessage>[];
   }
 
   @override

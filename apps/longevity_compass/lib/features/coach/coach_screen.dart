@@ -87,6 +87,25 @@ class _CoachScreenState extends State<CoachScreen> {
                 subtitle:
                     'You should not need to start from zero. I already have your last doctor context and your connected watch data.',
               ),
+              if (controller.usesLiveAgent) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppPalette.mint.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Text(
+                    'Live coach connected. New questions in this view are sent to the real agent for this patient, not the local demo reply builder.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppPalette.ink,
+                          fontWeight: FontWeight.w700,
+                          height: 1.4,
+                        ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               SectionSurface(
                 title: 'What I already know',
@@ -174,6 +193,26 @@ class _CoachScreenState extends State<CoachScreen> {
                   : 'Use this to clarify the plan, explain what changed, or ask what support makes sense next.',
               child: Column(
                 children: [
+                  if (controller.chatMessages.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppPalette.canvas.withValues(alpha: 0.54),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        controller.isWelcomeJourney
+                            ? 'No messages yet. Start by telling the coach what you want help with first.'
+                            : 'No messages yet in this session. Ask a fresh question here and the live coach will answer for this patient.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppPalette.ink.withValues(alpha: 0.78),
+                              height: 1.4,
+                            ),
+                      ),
+                    ),
+                  if (controller.chatMessages.isEmpty)
+                    const SizedBox(height: 12),
                   for (final message in controller.chatMessages) ...[
                     ChatBubble(message: message),
                     const SizedBox(height: 12),

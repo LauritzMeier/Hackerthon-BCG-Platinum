@@ -5,12 +5,14 @@ import '../firebase/firestore_chat_service.dart';
 import '../firebase/firestore_support_booking_service.dart';
 import '../firebase/firebase_session_service.dart';
 import '../models/experience_models.dart';
+import 'agent_chat_service.dart';
 import 'api_client.dart';
 import 'local_coach_reply_service.dart';
 
 class ExperienceRepository {
   ExperienceRepository({
     ApiClient? apiClient,
+    AgentChatService? agentChatService,
     FirestoreExperienceService? firestoreExperienceService,
     FirestoreChatService? firestoreChatService,
     FirestoreCustomerProfileService? firestoreCustomerProfileService,
@@ -18,6 +20,7 @@ class ExperienceRepository {
     FirebaseSessionService? firebaseSessionService,
     LocalCoachReplyService? localCoachReplyService,
   })  : _apiClient = apiClient ?? ApiClient(),
+        _agentChatService = agentChatService ?? AgentChatService(),
         _firestoreExperienceService =
             firestoreExperienceService ?? FirestoreExperienceService(),
         _firestoreChatService = firestoreChatService ?? FirestoreChatService(),
@@ -31,6 +34,7 @@ class ExperienceRepository {
             localCoachReplyService ?? const LocalCoachReplyService();
 
   final ApiClient _apiClient;
+  final AgentChatService _agentChatService;
   final FirestoreExperienceService _firestoreExperienceService;
   final FirestoreChatService _firestoreChatService;
   final FirestoreCustomerProfileService _firestoreCustomerProfileService;
@@ -71,6 +75,17 @@ class ExperienceRepository {
     CustomerProfile? customerProfile,
     List<SupportBooking> supportBookings = const [],
   }) async {
+    if (experience != null && shouldUseLiveAgentFor(customerProfile)) {
+      final replyText = await _agentChatService.requestReplyText(
+        message: message,
+        patientId: patientId,
+      );
+      return CoachReply(
+        reply: replyText,
+        primaryFocus: experience.weeklyPlan.primaryFocus,
+      );
+    }
+
     if (AppConfig.enableFirebase && experience != null) {
       return _localCoachReplyService.buildReply(
         experience: experience,
@@ -187,6 +202,11 @@ class ExperienceRepository {
 
   bool get isFirebaseEnabled => AppConfig.enableFirebase;
 
+  bool get hasAgentConfigured => AppConfig.agentBaseUrl.trim().isNotEmpty;
+
+  bool shouldUseLiveAgentFor(CustomerProfile? customerProfile) =>
+      hasAgentConfigured && !(customerProfile?.isWelcomeJourney ?? false);
+
   String? get currentFirebaseUserId => _firebaseSessionService.currentUserId;
 
   String? get firebaseSessionError => _firebaseSessionService.lastError;
@@ -195,6 +215,7 @@ class ExperienceRepository {
 
   void dispose() {
     _apiClient.dispose();
+    _agentChatService.dispose();
   }
 
   CustomerProfile _fallbackCustomerProfile({

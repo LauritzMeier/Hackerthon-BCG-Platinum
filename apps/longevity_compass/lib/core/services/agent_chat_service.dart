@@ -65,9 +65,61 @@ class AgentChatService {
     return value.startsWith('/') ? value : '/$value';
   }
 
+  String get _jsonChatPath => '/chat';
+
   Uri _uri(String path) {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
     return Uri.parse('$_baseUrl$normalizedPath');
+  }
+
+  Future<String> requestReplyText({
+    required String message,
+    required String patientId,
+  }) async {
+    late final http.Response response;
+    try {
+      response = await _client.post(
+        _uri(_jsonChatPath),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'message': message,
+          'patient_id': patientId,
+        }),
+      );
+    } on Exception catch (error) {
+      throw AgentChatException(
+        'Agent request could not be sent. $error',
+      );
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AgentChatException(
+        _decodeErrorBody(response.body, response.statusCode),
+        statusCode: response.statusCode,
+      );
+    }
+
+    final payload = _decodeJson(response.body);
+    final sections = payload['sections'];
+    if (sections is Iterable) {
+      final items = sections
+          .whereType<Object>()
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
+      if (items.isNotEmpty) {
+        return items.join('\n\n');
+      }
+    }
+
+    final reply = payload['reply']?.toString().trim() ?? '';
+    if (reply.isNotEmpty) {
+      return reply;
+    }
+
+    throw const AgentChatException(
+      'Agent response did not include any visible reply sections.',
+    );
   }
 
   Stream<AgentChatEvent> streamReply({

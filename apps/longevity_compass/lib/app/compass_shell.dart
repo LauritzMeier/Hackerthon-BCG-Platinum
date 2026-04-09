@@ -19,8 +19,8 @@ class CompassShell extends StatefulWidget {
 class _CompassShellState extends State<CompassShell> {
   late final DashboardController _controller;
   late final PageController _pageController;
-  final Set<String> _presentedWelcomeGuidePatientIds = <String>{};
   int _currentIndex = 1;
+  int _lastPresentedWelcomeGuideSequence = -1;
   bool _welcomeGuideVisible = false;
 
   static const List<_ShellDestination> _destinations = [
@@ -74,6 +74,17 @@ class _CompassShellState extends State<CompassShell> {
     );
   }
 
+  void _resetNavigation() {
+    if (_currentIndex != 1) {
+      setState(() {
+        _currentIndex = 1;
+      });
+    }
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(1);
+    }
+  }
+
   void _handleControllerChanged() {
     _maybePresentWelcomeGuide();
   }
@@ -85,16 +96,16 @@ class _CompassShellState extends State<CompassShell> {
     if (!mounted ||
         _controller.isLoading ||
         _welcomeGuideVisible ||
+        _controller.loginSequence == _lastPresentedWelcomeGuideSequence ||
         patientId == null ||
         customerProfile == null ||
         experience == null ||
-        !_controller.shouldShowWelcomeGuide ||
-        _presentedWelcomeGuidePatientIds.contains(patientId)) {
+        !_controller.shouldShowWelcomeGuide) {
       return;
     }
 
     _welcomeGuideVisible = true;
-    _presentedWelcomeGuidePatientIds.add(patientId);
+    _lastPresentedWelcomeGuideSequence = _controller.loginSequence;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) {
@@ -129,99 +140,123 @@ class _CompassShellState extends State<CompassShell> {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<DashboardController>.value(
       value: _controller,
-      child: Scaffold(
-        backgroundColor: AppPalette.canvas,
-        body: _ShellBackdrop(
-          child: SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final useFrame = constraints.maxWidth >= 720;
-                final shellWidth = useFrame
-                    ? (constraints.maxWidth * 0.58)
-                        .clamp(440.0, 620.0)
-                        .toDouble()
-                    : constraints.maxWidth;
+      child: Consumer<DashboardController>(
+        builder: (context, controller, _) {
+          return Scaffold(
+            backgroundColor: AppPalette.canvas,
+            body: _ShellBackdrop(
+              child: SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final useFrame = constraints.maxWidth >= 720;
+                    final shellWidth = useFrame
+                        ? (constraints.maxWidth * 0.58)
+                            .clamp(440.0, 620.0)
+                            .toDouble()
+                        : constraints.maxWidth;
 
-                return Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(useFrame ? 18 : 0),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: shellWidth),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(
-                            alpha: useFrame ? 0.14 : 0,
+                    if (!controller.hasBootstrapped && controller.isLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (!controller.isLoggedIn) {
+                      return Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(useFrame ? 18 : 0),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: shellWidth),
+                            child: _LoginGate(
+                              controller: controller,
+                              onLoginSuccess: _resetNavigation,
+                            ),
                           ),
-                          borderRadius: BorderRadius.circular(
-                            useFrame ? 42 : 0,
-                          ),
-                          border: useFrame
-                              ? Border.all(
-                                  color: Colors.white.withValues(alpha: 0.42),
-                                )
-                              : null,
-                          boxShadow: useFrame
-                              ? [
-                                  BoxShadow(
-                                    color: AppPalette.ink.withValues(
-                                      alpha: 0.12,
-                                    ),
-                                    blurRadius: 36,
-                                    offset: const Offset(0, 18),
-                                  ),
-                                ]
-                              : null,
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            useFrame ? 42 : 0,
-                          ),
+                      );
+                    }
+
+                    return Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(useFrame ? 18 : 0),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: shellWidth),
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.white.withValues(alpha: 0.24),
-                                  Colors.white.withValues(alpha: 0.06),
-                                ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
+                              color: Colors.white.withValues(
+                                alpha: useFrame ? 0.14 : 0,
                               ),
+                              borderRadius: BorderRadius.circular(
+                                useFrame ? 42 : 0,
+                              ),
+                              border: useFrame
+                                  ? Border.all(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.42),
+                                    )
+                                  : null,
+                              boxShadow: useFrame
+                                  ? [
+                                      BoxShadow(
+                                        color: AppPalette.ink.withValues(
+                                          alpha: 0.12,
+                                        ),
+                                        blurRadius: 36,
+                                        offset: const Offset(0, 18),
+                                      ),
+                                    ]
+                                  : null,
                             ),
-                            child: Column(
-                              children: [
-                                const _ShellTopBar(),
-                                Expanded(
-                                  child: PageView(
-                                    controller: _pageController,
-                                    onPageChanged: (index) {
-                                      setState(() {
-                                        _currentIndex = index;
-                                      });
-                                    },
-                                    children: const [
-                                      CoachScreen(),
-                                      DashboardScreen(),
-                                      FutureScreen(),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                useFrame ? 42 : 0,
+                              ),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.white.withValues(alpha: 0.24),
+                                      Colors.white.withValues(alpha: 0.06),
                                     ],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
                                   ),
                                 ),
-                                _ShellBottomBar(
-                                  currentIndex: _currentIndex,
-                                  destinations: _destinations,
-                                  onSelected: _selectTab,
+                                child: Column(
+                                  children: [
+                                    const _ShellTopBar(),
+                                    Expanded(
+                                      child: PageView(
+                                        controller: _pageController,
+                                        onPageChanged: (index) {
+                                          setState(() {
+                                            _currentIndex = index;
+                                          });
+                                        },
+                                        children: const [
+                                          CoachScreen(),
+                                          DashboardScreen(),
+                                          FutureScreen(),
+                                        ],
+                                      ),
+                                    ),
+                                    _ShellBottomBar(
+                                      currentIndex: _currentIndex,
+                                      destinations: _destinations,
+                                      onSelected: _selectTab,
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -237,6 +272,131 @@ class _ShellDestination {
   final String label;
   final IconData icon;
   final Widget screen;
+}
+
+class _LoginGate extends StatefulWidget {
+  const _LoginGate({
+    required this.controller,
+    required this.onLoginSuccess,
+  });
+
+  final DashboardController controller;
+  final VoidCallback onLoginSuccess;
+
+  @override
+  State<_LoginGate> createState() => _LoginGateState();
+}
+
+class _LoginGateState extends State<_LoginGate> {
+  late final TextEditingController _usernameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _usernameController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit(String value) async {
+    final success = await widget.controller.loginWithUsername(value);
+    if (success && mounted) {
+      widget.onLoginSuccess();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final controller = widget.controller;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.86),
+        borderRadius: BorderRadius.circular(34),
+        boxShadow: [
+          BoxShadow(
+            color: AppPalette.ink.withValues(alpha: 0.08),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Longevity Compass',
+              style: theme.textTheme.headlineMedium?.copyWith(
+                color: AppPalette.ink,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Use one of the two demo usernames to enter the right journey. `patient0` opens the new-user setup path. `patient1` opens the active patient view.',
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: AppPalette.ink.withValues(alpha: 0.74),
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 22),
+            TextField(
+              controller: _usernameController,
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                labelText: 'Username',
+                hintText: 'patient0 or patient1',
+              ),
+              onSubmitted: _submit,
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final username in controller.supportedLoginUsernames)
+                  ActionChip(
+                    label: Text(username),
+                    onPressed: controller.isLoading
+                        ? null
+                        : () {
+                            _usernameController.text = username;
+                            _submit(username);
+                          },
+                  ),
+              ],
+            ),
+            if (controller.errorMessage != null &&
+                controller.errorMessage!.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Text(
+                controller.errorMessage!,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.red.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: controller.isLoading
+                  ? null
+                  : () => _submit(_usernameController.text),
+              child: Text(controller.isLoading ? 'Loading...' : 'Continue'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 Future<void> _showProfileSheet(
@@ -575,7 +735,7 @@ class _ProfileSheet extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Internal demo controls',
+                              'Account',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 color: AppPalette.ink,
                                 fontWeight: FontWeight.w700,
@@ -583,7 +743,7 @@ class _ProfileSheet extends StatelessWidget {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Patient switching lives here so the customer journey stays clean. Real customers would not see this panel.',
+                              'For this demo, you can switch between `patient0` and `patient1`, or log out and return to the login screen.',
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: AppPalette.ink.withValues(alpha: 0.7),
                                 height: 1.4,
@@ -591,23 +751,44 @@ class _ProfileSheet extends StatelessWidget {
                             ),
                             const SizedBox(height: 16),
                             for (var index = 0;
-                                index < controller.patients.length;
+                                index <
+                                    controller.supportedLoginUsernames.length;
                                 index++) ...[
-                              _PatientSheetRow(
-                                patient: controller.patients[index],
-                                selected:
-                                    controller.patients[index].patientId ==
-                                        controller.selectedPatientId,
-                                onTap: () {
-                                  Navigator.of(context).pop();
-                                  controller.selectPatient(
-                                    controller.patients[index].patientId,
-                                  );
-                                },
-                              ),
-                              if (index < controller.patients.length - 1)
+                              if (controller.hasPatient(
+                                controller.patientIdForUsername(
+                                      controller.supportedLoginUsernames[index],
+                                    ) ??
+                                    '',
+                              ))
+                                _LoginAccountRow(
+                                  username:
+                                      controller.supportedLoginUsernames[index],
+                                  selected: controller
+                                          .supportedLoginUsernames[index] ==
+                                      controller.selectedUsername,
+                                  onTap: () async {
+                                    Navigator.of(context).pop();
+                                    final patientId =
+                                        controller.patientIdForUsername(
+                                      controller.supportedLoginUsernames[index],
+                                    );
+                                    if (patientId != null) {
+                                      await controller.selectPatient(patientId);
+                                    }
+                                  },
+                                ),
+                              if (index <
+                                  controller.supportedLoginUsernames.length - 1)
                                 const Divider(height: 18),
                             ],
+                            const SizedBox(height: 16),
+                            OutlinedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                controller.logout();
+                              },
+                              child: const Text('Log out'),
+                            ),
                           ],
                         ),
                       ),
@@ -1005,14 +1186,14 @@ List<String> _providerOptionsFor(String sourceId) {
   }
 }
 
-class _PatientSheetRow extends StatelessWidget {
-  const _PatientSheetRow({
-    required this.patient,
+class _LoginAccountRow extends StatelessWidget {
+  const _LoginAccountRow({
+    required this.username,
     required this.selected,
     required this.onTap,
   });
 
-  final PatientListItem patient;
+  final String username;
   final bool selected;
   final VoidCallback onTap;
 
@@ -1032,7 +1213,7 @@ class _PatientSheetRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    patient.patientId,
+                    username,
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: AppPalette.ink,
                       fontWeight: FontWeight.w700,
@@ -1040,7 +1221,9 @@ class _PatientSheetRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${patient.age} • ${patient.country} • ${patient.primaryFocusArea}',
+                    username == 'patient0'
+                        ? 'New journey • onboarding guide'
+                        : 'Active journey • real patient context',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppPalette.ink.withValues(alpha: 0.68),
                     ),
