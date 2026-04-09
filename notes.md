@@ -1,30 +1,31 @@
-Driver: Competitors with much more appealing offers
+# Working Notes
 
-Main ask: AI driven longevity service --> Use the patient data to drive personalized recommendations / longevity journey
-Feature highlights:
-- Integrate upselling potential and other touchpoint interfaces
+This file is now a light scratchpad only.
 
+Current source-of-truth docs:
 
-First thoughts:
-Use both aggregated data and individual data for generating outputs
+- [docs/README.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/README.md)
+- [docs/product/brief.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/brief.md)
+- [docs/product/personas.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/personas.md)
+- [docs/product/journeys.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/journeys.md)
+- [docs/product/longevity-compass.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/longevity-compass.md)
+- [docs/architecture/google-first-mvp.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/architecture/google-first-mvp.md)
+- [AGENT.MD](/Users/lauritz/git/Hackerthon-BCG-Platinum/AGENT.MD)
 
-Main challenge: transform the data into insights
+## Still Relevant Themes
 
-Execution: two step approach: build business case and design proposal first, then MVP implementation. Add an outlook to full v1 featureset. Keep measurability in mind
+- competitors are winning through better consumer-grade offers
+- the core ask is an AI-driven longevity journey based on patient data
+- the hard part is translating fragmented data into useful insights
+- the strongest current product concept is the Longevity Compass
+- we should think in two layers:
+  - consulting story and business case
+  - MVP product and architecture
+- measurability matters from the start
 
+## Open Questions
 
-
-First steps:
-1. Find out and define exactly what longevity is
-2. Define longevity dimensions (biological age etc.)
-3. Define featureset
-4. Let Gemini define the stack
-
-MVP Ideas:
-Include scientific data to increase accuracy of the LLM
-
-
-Questions:
-Data Sensitivity - what data can be aggregated, what data has to stay personal
-Which market are we focussing on? Europe?
-What is the core user persona? 
+- which primary persona should anchor the live demo?
+- what is the best north star metric for year one?
+- which monetization path should the MVP emphasize first?
+- how should we draw the safety boundary for the chatbot or coach?

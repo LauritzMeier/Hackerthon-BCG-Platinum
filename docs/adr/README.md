@@ -21,4 +21,7 @@ Architecture Decision Records capture durable choices that shape this repository
 - [0002-patient-facing-mvp-scope.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/0002-patient-facing-mvp-scope.md)
 - [0003-persona-portfolio-before-single-persona-selection.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/0003-persona-portfolio-before-single-persona-selection.md)
 - [0004-agent-operating-model-and-subagents.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/0004-agent-operating-model-and-subagents.md)
+- [0005-documentation-first-operating-model.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/0005-documentation-first-operating-model.md)
+- [0006-google-first-mvp-architecture.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/0006-google-first-mvp-architecture.md)
+- [0007-longevity-compass-core-experience.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/0007-longevity-compass-core-experience.md)
 - [template.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/template.md)

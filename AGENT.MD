@@ -12,22 +12,27 @@ Build a patient-facing longevity MVP for a European healthcare group that turns 
 
 The current emphasis is fundamentals first:
 
+- documentation hygiene
 - product framing
 - persona quality
+- user-journey quality
+- monetization clarity
 - system architecture
 - documented decisions
 
 ## Current Scope
 
 - Patient-facing journey only
-- Local-first development stack
+- Google-first target deployment with fast local prototyping
 - Raw challenge data stored in `data/raw/`
 - Thin API over curated patient-facing data
 - Early heuristics are acceptable if they are transparent and easy to replace
+- No major build work should start until the relevant goals, journey, monetization path, and success metric are documented
 
 ## Non-Negotiables
 
 - Do not mutate raw CSV inputs in `data/raw/`.
+- Clean and reconcile the relevant documentation before every substantial task.
 - Do not present the product as medical diagnosis or emergency care.
 - Do not infer sensitive attributes as facts when the dataset does not contain them.
 - Treat wealth and purchasing power as service-design segmentation, not as a claim about an individual patient.
@@ -41,6 +46,9 @@ The current emphasis is fundamentals first:
 - Keep the coach supportive, evidence-aware, and appropriately cautious.
 - Separate health insight from upsell mechanics so the commercial layer never feels manipulative.
 - Design for European variation in age, nationality, digital fluency, household context, and price sensitivity.
+- Optimize for regular use, not one-time novelty.
+- Treat monetization as a design constraint from the start.
+- If we add a chatbot, it must improve retention, clarity, or conversion rather than exist as a demo gimmick.
 
 ## Repo Map
 
@@ -51,8 +59,9 @@ data/
   raw/
   warehouse/
 docs/
-  challenge-summary.md
-  personas.md
+  README.md
+  product/
+  architecture/
   adr/
 scripts/
 sql/
@@ -63,18 +72,33 @@ src/
 
 When starting a task:
 
-1. Read `README.md`, `docs/challenge-summary.md`, and the most relevant ADRs.
-2. Check whether the task is primarily product, data, backend, or demo/storytelling.
-3. Choose the right subagent mentally or operationally before editing.
-4. Make the smallest durable change that improves the foundation.
-5. Update documentation when a decision changes how future work should happen.
+1. Do a quick documentation hygiene pass on the files that will be touched.
+2. Read `README.md`, [docs/README.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/README.md), and the most relevant ADRs.
+3. Check whether the task is primarily product, data, backend, or demo/storytelling.
+4. Choose the right subagent mentally or operationally before editing.
+5. If the task is feature-oriented, confirm the relevant goal, journey, monetization path, and KPI are already documented.
+6. Make the smallest durable change that improves the foundation.
+7. Update documentation when a decision changes how future work should happen.
 
 Before merging or handing over work:
 
 1. Confirm the relevant scripts still run.
 2. Confirm the change fits the patient-facing MVP scope.
-3. Note assumptions and unresolved risks.
-4. Create or update an ADR if the choice affects future architecture or ways of working.
+3. Confirm the documentation still points to the current source of truth.
+4. Note assumptions and unresolved risks.
+5. Create or update an ADR if the choice affects future architecture or ways of working.
+
+## Documentation Hygiene Checklist
+
+Before any substantial task, check whether any of the following need cleanup:
+
+- stale assumptions in `README.md`
+- outdated scope or goals in `docs/product/brief.md`
+- changed product direction in `docs/product/longevity-compass.md`
+- new or revised journeys in `docs/product/journeys.md`
+- new architecture choices in `docs/architecture/google-first-mvp.md`
+- ADR index links or statuses
+- scratch content in `notes.md` that should be clarified or archived
 
 ## Subagents
 
@@ -102,6 +126,28 @@ Guardrails:
 - do not confuse demographic stereotype with validated need
 - state clearly which persona attributes come from data vs design assumptions
 
+### `documentation-curator`
+
+Use for:
+
+- doc cleanup
+- source-of-truth alignment
+- ADR hygiene
+- handoff clarity
+
+Outputs:
+
+- cleaned docs
+- updated cross-links
+- reduced duplication
+- documented assumptions
+
+Guardrails:
+
+- prefer one clear source of truth over repeated similar content
+- preserve important context while removing stale or misleading notes
+- make it easy for the next contributor to know where to start
+
 ### `journey-designer`
 
 Use for:
@@ -117,12 +163,36 @@ Outputs:
 - user stories
 - north star metric proposal
 - in-app touchpoint placement
+- retention loop design
 
 Guardrails:
 
 - prioritize low cognitive load
 - avoid alarmist copy
 - keep commercial prompts additive, not disruptive
+- design for recurring weekly or monthly value, not just onboarding
+
+### `commercial-strategist`
+
+Use for:
+
+- monetization logic
+- offer design
+- conversion points
+- pricing and packaging hypotheses
+
+Outputs:
+
+- monetization paths
+- offer ladders
+- conversion assumptions
+- business-case hooks
+
+Guardrails:
+
+- patient value must come before commercial extraction
+- every monetization touchpoint should be explainable as relevant and timely
+- distinguish between recurring revenue, episodic revenue, and referral value
 
 ### `data-architect`
 
@@ -188,6 +258,7 @@ Guardrails:
 - never overstate certainty
 - never imply diagnosis from heuristic scoring alone
 - recommend clinical follow-up where risk signals are elevated
+- make clear when advice is general wellness support versus clinically relevant escalation
 
 ### `demo-storyliner`
 
@@ -212,7 +283,9 @@ Guardrails:
 
 ## Recommended Task Routing
 
+- Start with `documentation-curator` whenever the docs drift or the task meaningfully changes direction.
 - Persona work starts with `persona-strategist`, then `journey-designer`.
+- Monetization design gets a `commercial-strategist` pass before implementation.
 - Scoring or warehouse changes start with `data-architect`, then `backend-builder`.
 - Coach prompt or recommendation work always gets a `coach-safety-reviewer` pass.
 - Demo prep starts with `demo-storyliner` but must reuse existing personas and ADRs.
@@ -245,8 +318,12 @@ New ADRs go in `docs/adr/` with a four-digit prefix.
 
 ## Current Source Of Truth
 
-- Challenge framing: [docs/challenge-summary.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/challenge-summary.md)
-- Persona library: [docs/personas.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/personas.md)
+- Documentation index: [docs/README.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/README.md)
+- Product brief: [docs/product/brief.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/brief.md)
+- Persona library: [docs/product/personas.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/personas.md)
+- User journeys: [docs/product/journeys.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/journeys.md)
+- Longevity Compass: [docs/product/longevity-compass.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/longevity-compass.md)
+- Google-first MVP architecture: [docs/architecture/google-first-mvp.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/architecture/google-first-mvp.md)
 - ADR index: [docs/adr/README.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/README.md)
 
 ## Definition Of Done For Fundamentals
@@ -254,7 +331,7 @@ New ADRs go in `docs/adr/` with a four-digit prefix.
 A fundamentals change is complete when:
 
 - personas are richer, more diverse, and more actionable
+- user journeys are explicit and monetization-aware
 - architecture choices are documented
 - new contributors can understand how to work in the repo
 - future agent or subagent work has clear role boundaries
-

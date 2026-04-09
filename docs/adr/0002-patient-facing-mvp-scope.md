@@ -18,7 +18,7 @@ The system should prioritize:
 - personalized coaching
 - risk and opportunity flags
 - relevant preventive offers
-- simple API payloads for a patient app
+- simple API payloads for mobile and web patient apps
 
 Internal operational or clinician-facing experiences are explicitly out of scope for the first version.
 
@@ -33,4 +33,3 @@ Internal operational or clinician-facing experiences are explicitly out of scope
 - dual patient and clinician MVP
 - clinician-first workflow
 - analytics-first proof of concept
-
