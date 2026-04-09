@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../app/app_theme.dart';
 import '../../widgets/compass_components.dart';
 import '../dashboard/dashboard_controller.dart';
 
@@ -51,42 +52,77 @@ class _CoachScreenState extends State<CoachScreen> {
           children: [
             ScreenHeader(
               eyebrow: experience.coach.coachName,
-              title: 'Ask why your compass changed, or what to do next.',
+              title: 'Talk through what happened and what to do next.',
               subtitle:
-                  'The coach is designed as the conversational interface to the six-pillar model, not as a separate novelty feature.',
+                  'A new user should feel like the coach already knows their health context, explains it in plain language, and is honest about what still needs tracking.',
             ),
             const SizedBox(height: 24),
             SectionSurface(
-              title: 'Firestore conversation sync',
-              subtitle:
-                  'Every send can be mirrored to `${controller.firestoreMessagesPath}` for clinic demos and backend handoff testing.',
+              title: 'What I already know about you',
+              subtitle: experience.careContext.headline,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    controller.firestoreStatusMessage ??
-                        'Firebase session status has not been checked yet.',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    controller.isFirebaseEnabled
-                        ? 'Authentication mode: Firebase anonymous sign-in.'
-                        : 'Enable Firebase with `APP_ENABLE_FIREBASE=true` to persist messages.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.color
-                              ?.withValues(alpha: 0.72),
+                    experience.coach.intro,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          height: 1.45,
                         ),
                   ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppPalette.sand.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      experience.careContext.lastAppointmentSummary,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            height: 1.4,
+                            color: AppPalette.ink.withValues(alpha: 0.82),
+                          ),
+                    ),
+                  ),
+                  if (experience.careContext.medications.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _CoachInfoList(
+                      title: 'Medications on file',
+                      items: experience.careContext.medications,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SectionSurface(
+              title: 'How I can tailor better',
+              subtitle: experience.dataCoverage.confidenceLabel,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    experience.dataCoverage.tailoringNote,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          height: 1.45,
+                        ),
+                  ),
+                  if (experience.dataCoverage.missingSources.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _CoachInfoList(
+                      title: 'What is still missing',
+                      items: experience.dataCoverage.missingSources,
+                    ),
+                  ],
                 ],
               ),
             ),
             const SizedBox(height: 24),
             SectionSurface(
               title: 'Suggested prompts',
+              subtitle:
+                  'These prompts should help a new user get oriented without guessing what to ask first.',
               child: Wrap(
                 spacing: 10,
                 runSpacing: 10,
@@ -104,7 +140,7 @@ class _CoachScreenState extends State<CoachScreen> {
             SectionSurface(
               title: 'Conversation',
               subtitle:
-                  'A supportive, plain-language layer over your plan, flags, and offers.',
+                  'Use the coach to explain your last visit, your next step, or what would make the plan more personal.',
               child: Column(
                 children: [
                   for (final message in controller.chatMessages) ...[
@@ -133,7 +169,7 @@ class _CoachScreenState extends State<CoachScreen> {
                     maxLines: 4,
                     decoration: const InputDecoration(
                       hintText:
-                          'Ask why a pillar is drifting or how to adapt the plan.',
+                          'Tell the coach what happened, what your doctor said, or what feels unclear.',
                     ),
                     onSubmitted: (value) => _send(controller, value),
                   ),
@@ -147,9 +183,91 @@ class _CoachScreenState extends State<CoachScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 24),
+            SectionSurface(
+              title: 'Conversation sync status',
+              subtitle:
+                  'Kept for demos and backend handoff checks, but no longer shown as the primary user story.',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    controller.firestoreStatusMessage ??
+                        'Firebase session status has not been checked yet.',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    controller.isFirebaseEnabled
+                        ? 'Authentication mode: Firebase anonymous sign-in.'
+                        : 'Enable Firebase with `APP_ENABLE_FIREBASE=true` to persist messages.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.color
+                              ?.withValues(alpha: 0.72),
+                        ),
+                  ),
+                ],
+              ),
+            ),
           ],
         );
       },
+    );
+  }
+}
+
+class _CoachInfoList extends StatelessWidget {
+  const _CoachInfoList({
+    required this.title,
+    required this.items,
+  });
+
+  final String title;
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppPalette.ink,
+              ),
+        ),
+        const SizedBox(height: 10),
+        for (var index = 0; index < items.length; index++) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Icon(
+                  Icons.circle,
+                  size: 8,
+                  color: AppPalette.forest,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  items[index],
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        height: 1.4,
+                        color: AppPalette.ink.withValues(alpha: 0.76),
+                      ),
+                ),
+              ),
+            ],
+          ),
+          if (index < items.length - 1) const SizedBox(height: 10),
+        ],
+      ],
     );
   }
 }

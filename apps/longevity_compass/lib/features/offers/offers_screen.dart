@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/mock/persona_clinic_service_catalog.dart';
 import '../../widgets/compass_components.dart';
 import '../dashboard/dashboard_controller.dart';
 
@@ -25,57 +24,76 @@ class OffersScreen extends StatelessWidget {
           children: [
             const ScreenHeader(
               eyebrow: 'Support Options',
-              title:
-                  'Clinic services should feel persona-specific, not generic.',
+              title: 'Support should feel earned, relevant, and easy to understand.',
               subtitle:
-                  'These mocked programs turn the three strongest MVP personas into concrete clinic packages your team can pitch and test.',
+                  'A new user should see one clear next step, why it fits their current situation, and what would make the recommendation even better.',
             ),
             const SizedBox(height: 24),
             SectionSurface(
-              title: 'Persona-ready clinic programs',
+              title: 'How these recommendations are being chosen',
               subtitle:
-                  'Mocked service bundles for Markus, Sofia, and Tomasz, the three strongest starter personas from the product strategy.',
+                  experience?.dataCoverage.confidenceLabel ??
+                      'The app should be honest about what it knows and what is still missing.',
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (var index = 0;
-                      index < mvpPersonaClinicPrograms.length;
-                      index++) ...[
-                    _PersonaProgramCard(
-                        program: mvpPersonaClinicPrograms[index]),
-                    if (index < mvpPersonaClinicPrograms.length - 1)
-                      const SizedBox(height: 16),
-                  ],
+                  Text(
+                    experience?.journeyStart.summary ??
+                        'The recommendation engine should use care context, watch data, and obvious data gaps before it suggests extra support.',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          height: 1.45,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  _OfferContextBlock(
+                    title: 'What we already know',
+                    items: experience?.journeyStart.whatWeKnow ?? const [],
+                  ),
+                  const SizedBox(height: 12),
+                  _OfferContextBlock(
+                    title: 'What would make support more precise',
+                    items: experience?.journeyStart.whatWeNeed ?? const [],
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
             if (recommended != null) ...[
               SectionSurface(
-                title: 'Current patient offer from the Compass',
+                title: 'Best next support',
                 subtitle:
-                    'This option still comes from the current API payload and stays useful as a patient-level recommendation example.',
+                    'The first recommendation should solve the most obvious user need, not just advertise a package.',
                 child: OfferTile(
                   offer: recommended,
                   highlight: true,
                 ),
               ),
               const SizedBox(height: 24),
+              SectionSurface(
+                title: 'What should happen before the user buys more',
+                subtitle:
+                    'For a new user, trust grows when the app makes the next step feel manageable.',
+                child: _OfferContextBlock(
+                  title: 'Start here first',
+                  items: experience?.journeyStart.startHere ?? const [],
+                ),
+              ),
+              const SizedBox(height: 24),
             ] else
               SectionSurface(
-                title: 'Current patient offer unavailable',
+                title: 'No primary support recommendation yet',
                 subtitle:
-                    'The mocked persona programs above are ready even if the patient payload has not loaded yet.',
+                    'The screen should still explain what support would become relevant once the patient context loads.',
                 child: Text(
                   controller.errorMessage ??
-                      'No patient-specific offer is loaded right now, so the persona service catalog is acting as the primary demo layer.',
+                      'No patient-specific support option is loaded right now.',
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ),
-            const SizedBox(height: 24),
             SectionSurface(
-              title: 'Additional API-driven options',
+              title: 'Useful next options, but not first',
               subtitle:
-                  'A fallback ladder for broader support, without overwhelming the user.',
+                  'These remain relevant without overwhelming the user or pushing something unrelated.',
               child: Column(
                 children: [
                   for (var index = 0; index < additional.length; index++) ...[
@@ -85,7 +103,7 @@ class OffersScreen extends StatelessWidget {
                   ],
                   if (additional.isEmpty)
                     Text(
-                      'The Compass does not suggest additional support right now.',
+                      'No secondary options are loaded right now.',
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                 ],
@@ -98,10 +116,14 @@ class OffersScreen extends StatelessWidget {
   }
 }
 
-class _PersonaProgramCard extends StatelessWidget {
-  const _PersonaProgramCard({required this.program});
+class _OfferContextBlock extends StatelessWidget {
+  const _OfferContextBlock({
+    required this.title,
+    required this.items,
+  });
 
-  final PersonaClinicProgram program;
+  final String title;
+  final List<String> items;
 
   @override
   Widget build(BuildContext context) {
@@ -118,87 +140,35 @@ class _PersonaProgramCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${program.personaName} • ${program.country}',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            program.focus,
+            title,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            program.positioning,
-            style: theme.textTheme.bodyLarge?.copyWith(height: 1.45),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            program.salesNarrative,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              height: 1.45,
-              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.72),
+          const SizedBox(height: 12),
+          for (var index = 0; index < items.length; index++) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Icon(
+                    Icons.circle,
+                    size: 8,
+                    color: Color(0xFF2F5D4E),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    items[index],
+                    style: theme.textTheme.bodyLarge?.copyWith(height: 1.45),
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 18),
-          for (var index = 0; index < program.services.length; index++) ...[
-            _ClinicServiceTile(service: program.services[index]),
-            if (index < program.services.length - 1) const SizedBox(height: 12),
+            if (index < items.length - 1) const SizedBox(height: 10),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ClinicServiceTile extends StatelessWidget {
-  const _ClinicServiceTile({required this.service});
-
-  final ClinicServiceMock service;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6F0E7),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            service.title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            service.format,
-            style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            service.outcome,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              height: 1.4,
-              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.78),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            service.commercialRole,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
         ],
       ),
     );

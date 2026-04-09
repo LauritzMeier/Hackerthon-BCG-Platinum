@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from main import analyze_six_pillars, build_tailored_explanation, explain_pillar
+from .main import analyze_six_pillars, build_tailored_explanation, explain_pillar
 
 app = FastAPI(
     title="Longevity ADK Agent Server",

@@ -9,7 +9,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any, Dict, List, Optional
 
-from firebase_client import get_patient_firebase_context
+from .firebase_client import get_patient_firebase_context
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"
 EHR_FILE = DATA_DIR / "ehr_records.csv"

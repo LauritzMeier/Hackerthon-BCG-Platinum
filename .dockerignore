@@ -1,8 +1,16 @@
 .git
 .venv
+.env
+.env.local
+.agents
+.codex
 __pycache__
 *.pyc
 .DS_Store
+AGENT.MD
+docs/
+apps/
+notes.md
 apps/*/.dart_tool
 apps/*/build
 data/warehouse/*

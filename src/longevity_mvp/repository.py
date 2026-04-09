@@ -70,6 +70,40 @@ class WarehouseRepository:
         finally:
             connection.close()
 
+    def get_age_peer_profiles(
+        self,
+        patient_id: str,
+        age: int,
+        age_band: int = 5,
+        limit: int = 200,
+    ) -> List[Dict]:
+        connection = self._connect()
+        try:
+            cursor = connection.execute(
+                """
+                SELECT
+                    profile.*,
+                    metrics.* EXCLUDE (patient_id),
+                    coach_context.* EXCLUDE (patient_id, age, sex, country, latest_wearable_date,
+                                             estimated_biological_age, sleep_recovery_score,
+                                             cardiovascular_fitness_score, lifestyle_behavior_score,
+                                             metabolic_health_score)
+                FROM curated.patient_profile AS profile
+                LEFT JOIN curated.patient_metrics AS metrics
+                    USING (patient_id)
+                LEFT JOIN curated.coach_context AS coach_context
+                    USING (patient_id)
+                WHERE profile.patient_id <> ?
+                  AND profile.age BETWEEN ? AND ?
+                ORDER BY ABS(profile.age - ?), profile.patient_id
+                LIMIT ?
+                """,
+                [patient_id, age - age_band, age + age_band, age, limit],
+            )
+            return _rows_to_dicts(cursor)
+        finally:
+            connection.close()
+
     def get_patient_timeline(self, patient_id: str, days: int = 30) -> List[Dict]:
         connection = self._connect()
         try:
@@ -129,9 +163,17 @@ class WarehouseRepository:
         profile = self.get_patient_profile(patient_id)
         if profile is None:
             return None
+
+        age = profile.get("age")
+        age_peers = (
+            self.get_age_peer_profiles(patient_id, int(age))
+            if age is not None
+            else []
+        )
         return {
             "profile": profile,
             "flags": self.get_patient_flags(patient_id),
             "offers": self.get_patient_offers(patient_id),
             "timeline": self.get_patient_timeline(patient_id, days=days),
+            "age_peers": age_peers,
         }

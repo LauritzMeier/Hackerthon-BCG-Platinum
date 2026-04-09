@@ -3,26 +3,37 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Dict
 
 from dotenv import load_dotenv
 from google.adk.agents import Agent
 
-from firebase_client import push_test_message
-from pillar_analysis import (
+from .firebase_client import push_test_message
+from .pillar_analysis import (
     analyze_patient_six_pillars,
     explain_single_pillar,
     generate_tailored_explanation,
 )
 
-load_dotenv(".env.local")
+ROOT_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(ROOT_DIR / ".env.local")
 load_dotenv()
 
-# Prioritize environment variable, fallback to the hackathon default
-PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "longevity-compass-firestore")
-os.environ["FIREBASE_PROJECT_ID"] = PROJECT_ID
+PROJECT_ID = (
+    os.getenv("FIREBASE_PROJECT_ID")
+    or os.getenv("GOOGLE_CLOUD_PROJECT")
+    or os.getenv("GCLOUD_PROJECT")
+)
+DATABASE_ID = os.getenv("FIRESTORE_DATABASE_ID", "(default)")
+if PROJECT_ID:
+    os.environ["FIREBASE_PROJECT_ID"] = PROJECT_ID
 
-print(f"--- Agent initialized for Project: {PROJECT_ID} ---")
+print(
+    "--- Agent initialized for Project: "
+    f"{PROJECT_ID or 'auto-detect'}"
+    f" | Firestore database: {DATABASE_ID} ---"
+)
 
 
 def write_message_to_firebase(message: str) -> Dict[str, Any]:
