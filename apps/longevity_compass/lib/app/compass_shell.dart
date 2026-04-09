@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/models/experience_models.dart';
+import '../core/presentation/customer_facing_content.dart';
 import '../core/services/experience_repository.dart';
 import '../features/coach/coach_screen.dart';
 import '../features/dashboard/dashboard_controller.dart';
@@ -333,7 +334,7 @@ class _LoginGateState extends State<_LoginGate> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Longevity Compass',
+              'Choose a demo journey',
               style: theme.textTheme.headlineMedium?.copyWith(
                 color: AppPalette.ink,
                 fontWeight: FontWeight.w800,
@@ -341,7 +342,7 @@ class _LoginGateState extends State<_LoginGate> {
             ),
             const SizedBox(height: 10),
             Text(
-              'Use one of the two demo usernames to enter the right journey. `patient0` opens the new-user setup path. `patient1` opens the active patient view.',
+              'Choose Mila Neumann for the blank-slate onboarding journey or Daniel Moreau for the active recovery journey.',
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: AppPalette.ink.withValues(alpha: 0.74),
                 height: 1.45,
@@ -352,8 +353,8 @@ class _LoginGateState extends State<_LoginGate> {
               controller: _usernameController,
               textInputAction: TextInputAction.done,
               decoration: const InputDecoration(
-                labelText: 'Username',
-                hintText: 'patient0 or patient1',
+                labelText: 'Patient name',
+                hintText: 'Mila Neumann or Daniel Moreau',
               ),
               onSubmitted: _submit,
             ),
@@ -362,14 +363,19 @@ class _LoginGateState extends State<_LoginGate> {
               spacing: 10,
               runSpacing: 10,
               children: [
-                for (final username in controller.supportedLoginUsernames)
+                for (final patientId in controller.supportedDemoPatientIds)
                   ActionChip(
-                    label: Text(username),
+                    label: Text(customerDisplayNameForPatientId(patientId)),
                     onPressed: controller.isLoading
                         ? null
-                        : () {
-                            _usernameController.text = username;
-                            _submit(username);
+                        : () async {
+                            _usernameController.text =
+                                customerDisplayNameForPatientId(patientId);
+                            final success =
+                                await controller.loginWithPatientId(patientId);
+                            if (success && context.mounted) {
+                              widget.onLoginSuccess();
+                            }
                           },
                   ),
               ],
@@ -486,8 +492,10 @@ class _ShellTopBar extends StatelessWidget {
       builder: (context, controller, _) {
         final experience = controller.experience;
         final summary = experience == null
-            ? 'Bringing your care context into view.'
-            : 'This week: ${experience.weeklyPlan.primaryFocus.pillarName}.';
+            ? 'Bringing the current plan into view.'
+            : controller.isWelcomeJourney
+                ? 'Start with one useful next step.'
+                : 'Evidence first. One next step.';
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
@@ -583,7 +591,11 @@ class _ProfileSheet extends StatelessWidget {
           final experience = controller.experience;
           final patientMeta = experience == null
               ? 'Loading demo profile'
-              : '${experience.profileSummary.patientId} • ${experience.profileSummary.age} • ${experience.profileSummary.country}';
+              : customerMetaLabel(
+                  patientId: experience.profileSummary.patientId,
+                  age: experience.profileSummary.age,
+                  country: experience.profileSummary.country,
+                );
           final customerProfile = controller.customerProfile;
 
           return SafeArea(
@@ -691,7 +703,7 @@ class _ProfileSheet extends StatelessWidget {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Mock-connect the sources that would shape the customer journey next.',
+                                'For demo mode, turn sources on or off to see how the journey changes.',
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: AppPalette.ink.withValues(alpha: 0.7),
                                   height: 1.4,
@@ -743,7 +755,7 @@ class _ProfileSheet extends StatelessWidget {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'For this demo, you can switch between `patient0` and `patient1`, or log out and return to the login screen.',
+                              'For this demo, you can switch between Mila Neumann and Daniel Moreau, or log out and return to the login screen.',
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: AppPalette.ink.withValues(alpha: 0.7),
                                 height: 1.4,
@@ -751,34 +763,26 @@ class _ProfileSheet extends StatelessWidget {
                             ),
                             const SizedBox(height: 16),
                             for (var index = 0;
-                                index <
-                                    controller.supportedLoginUsernames.length;
+                                index < controller.supportedDemoPatientIds.length;
                                 index++) ...[
                               if (controller.hasPatient(
-                                controller.patientIdForUsername(
-                                      controller.supportedLoginUsernames[index],
-                                    ) ??
-                                    '',
+                                controller.supportedDemoPatientIds[index],
                               ))
                                 _LoginAccountRow(
-                                  username:
-                                      controller.supportedLoginUsernames[index],
-                                  selected: controller
-                                          .supportedLoginUsernames[index] ==
-                                      controller.selectedUsername,
+                                  patientId:
+                                      controller.supportedDemoPatientIds[index],
+                                  selected:
+                                      controller.supportedDemoPatientIds[index] ==
+                                          controller.selectedPatientId,
                                   onTap: () async {
                                     Navigator.of(context).pop();
-                                    final patientId =
-                                        controller.patientIdForUsername(
-                                      controller.supportedLoginUsernames[index],
+                                    await controller.selectPatient(
+                                      controller.supportedDemoPatientIds[index],
                                     );
-                                    if (patientId != null) {
-                                      await controller.selectPatient(patientId);
-                                    }
                                   },
                                 ),
                               if (index <
-                                  controller.supportedLoginUsernames.length - 1)
+                                  controller.supportedDemoPatientIds.length - 1)
                                 const Divider(height: 18),
                             ],
                             const SizedBox(height: 16),
@@ -837,10 +841,10 @@ class _WelcomeGuideDialog extends StatelessWidget {
         experience.coach.suggestedPrompts.take(2).toList(growable: false);
     final firstSupport = <String>[
       if (experience.offers.recommended != null)
-        experience.offers.recommended!.offerLabel,
+        practicalInfoForOffer(experience.offers.recommended!).title,
       ...experience.offers.additionalItems
           .take(2)
-          .map((offer) => offer.offerLabel),
+          .map((offer) => practicalInfoForOffer(offer).title),
     ];
 
     return Dialog(
@@ -865,7 +869,7 @@ class _WelcomeGuideDialog extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'What is possible here',
+                      'Start with one useful outcome',
                       style: theme.textTheme.headlineSmall?.copyWith(
                         color: AppPalette.ink,
                         fontWeight: FontWeight.w800,
@@ -879,7 +883,7 @@ class _WelcomeGuideDialog extends StatelessWidget {
                 ],
               ),
               Text(
-                'Start with one connection, one question, and one real next step. You do not need to set up everything before the app becomes useful.',
+                'Start with one connection, one question, and one real next step. You do not need a full setup before the app becomes useful.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: AppPalette.ink.withValues(alpha: 0.76),
                   height: 1.45,
@@ -918,7 +922,7 @@ class _WelcomeGuideDialog extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'Best first move: open Profile and connect one source you can realistically keep up to date.',
+                  'Best first move: connect one source you can realistically keep up to date.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: AppPalette.ink,
                     fontWeight: FontWeight.w700,
@@ -1188,12 +1192,12 @@ List<String> _providerOptionsFor(String sourceId) {
 
 class _LoginAccountRow extends StatelessWidget {
   const _LoginAccountRow({
-    required this.username,
+    required this.patientId,
     required this.selected,
     required this.onTap,
   });
 
-  final String username;
+  final String patientId;
   final bool selected;
   final VoidCallback onTap;
 
@@ -1213,7 +1217,7 @@ class _LoginAccountRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    username,
+                    customerDisplayNameForPatientId(patientId),
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: AppPalette.ink,
                       fontWeight: FontWeight.w700,
@@ -1221,9 +1225,7 @@ class _LoginAccountRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    username == 'patient0'
-                        ? 'New journey • onboarding guide'
-                        : 'Active journey • real patient context',
+                    '${customerSubtitleForPatientId(patientId)} • ${customerLoginAliasForPatientId(patientId)}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppPalette.ink.withValues(alpha: 0.68),
                     ),

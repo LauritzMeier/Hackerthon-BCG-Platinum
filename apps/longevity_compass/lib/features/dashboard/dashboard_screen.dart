@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../app/app_theme.dart';
 import '../../core/models/experience_models.dart';
+import '../../core/presentation/customer_facing_content.dart';
 import '../../widgets/compass_components.dart';
 import 'dashboard_controller.dart';
 
@@ -33,6 +34,17 @@ class DashboardScreen extends StatelessWidget {
         final customerProfile = controller.customerProfile;
         final bookings = controller.supportBookings;
         final isWelcomeJourney = controller.isWelcomeJourney;
+        final startHere =
+            experience.journeyStart.startHere.take(3).toList(growable: false);
+        final watchTrends = experience.progressSummary.headlineTrends
+            .take(3)
+            .toList(growable: false);
+        final connectedSignals = experience.dataCoverage.connectedSources
+            .take(2)
+            .toList(growable: false);
+        final missingSignals = experience.dataCoverage.missingSources
+            .take(2)
+            .toList(growable: false);
 
         return RefreshIndicator(
           onRefresh: controller.refresh,
@@ -44,42 +56,54 @@ class DashboardScreen extends StatelessWidget {
                 ScreenHeader(
                   eyebrow: 'Today',
                   title: controller.hasStartedOnboarding
-                      ? 'You are setting things up.'
-                      : 'Welcome to Longevity Compass.',
-                  subtitle: controller.hasStartedOnboarding
-                      ? 'One good connection and one clear next step are already enough to make the journey feel real.'
-                      : 'Start simple: connect one useful source, decide what you want help with, and book one first step if you want clinician support.',
+                      ? 'One more setup step is enough.'
+                      : 'Start with one useful first step.',
+                  subtitle:
+                      'Do not build the whole journey at once. Pick one outcome, one connection, and one optional clinic step.',
                 ),
                 const SizedBox(height: 24),
                 SectionSurface(
-                  title: customerProfile?.journeyTitle ??
-                      'Start your longevity journey',
-                  subtitle: customerProfile?.journeySummary ??
-                      experience.journeyStart.summary,
+                  title: 'Best first move',
+                  subtitle: 'Get to the first moment of value quickly.',
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (customerProfile != null &&
-                          customerProfile.possibilities.isNotEmpty)
-                        _BulletList(
-                          title: 'What this app can do for you',
-                          items: customerProfile.possibilities,
+                      if (startHere.isNotEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: AppPalette.mint.withValues(alpha: 0.28),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Text(
+                            startHere.first,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyLarge
+                                ?.copyWith(
+                                  color: AppPalette.ink,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.4,
+                                ),
+                          ),
                         ),
-                      if (customerProfile != null &&
-                          customerProfile.possibilities.isNotEmpty)
+                      if (startHere.length > 1) ...[
                         const SizedBox(height: 16),
-                      _BulletList(
-                        title: 'Start here',
-                        items: experience.journeyStart.startHere,
-                      ),
+                        _BulletList(
+                          title: 'Then do',
+                          items: startHere.skip(1).toList(growable: false),
+                        ),
+                      ],
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
                 if (customerProfile != null)
                   SectionSurface(
-                    title: 'Setup progress',
+                    title: 'What is connected',
                     subtitle:
-                        'A new customer should only see the few setup steps that actually unlock value.',
+                        'Only the sources that change the next decision belong here.',
                     child: _WelcomeSourcesCard(
                       profile: customerProfile,
                       bookings: bookings,
@@ -107,9 +131,9 @@ class DashboardScreen extends StatelessWidget {
               ] else ...[
                 const ScreenHeader(
                   eyebrow: 'Today',
-                  title: 'Keep this week simple.',
+                  title: 'One clear focus for this week.',
                   subtitle:
-                      'See where you stand, the one goal for this week, and the few signals that matter most.',
+                      'Use just enough data to decide what to do and what to ignore.',
                 ),
                 const SizedBox(height: 24),
                 if (experience.compass.peerComparison.hasItems) ...[
@@ -119,9 +143,8 @@ class DashboardScreen extends StatelessWidget {
                 CompassHeroCard(experience: experience),
                 const SizedBox(height: 24),
                 SectionSurface(
-                  title: 'This week\'s focus',
-                  subtitle:
-                      'Start with the smallest set of actions that can actually move the week forward.',
+                  title: 'Do this next',
+                  subtitle: 'Keep the week small and achievable.',
                   child: Column(
                     children: [
                       for (var index = 0;
@@ -161,82 +184,67 @@ class DashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 SectionSurface(
-                  title: 'What informs the plan',
+                  title: 'Why this is the plan',
                   subtitle:
-                      'Doctor context, watch data, and one clear next input keep this grounded.',
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final stacked = constraints.maxWidth < 900;
-                      final cards = [
-                        _DashboardDetailCard(
-                          title: 'From your last appointment',
-                          body: experience.careContext.lastAppointmentSummary,
-                          tagsTitle: 'Medications on file',
-                          tags: experience.careContext.medications,
-                          listTitle: 'Priorities now',
-                          listItems: experience.careContext.clinicalPriorities
-                              .take(3)
-                              .toList(growable: false),
-                          footer: experience.careContext.medicalGuardrail,
-                          footerColor: AppPalette.sand.withValues(alpha: 0.92),
+                      'Every recommendation should be explainable from real data.',
+                  child: Column(
+                    children: [
+                      _PlanEvidenceRow(
+                        label: 'Based on care',
+                        body: _firstSentence(
+                          experience.careContext.lastAppointmentSummary,
                         ),
-                        _DashboardDetailCard(
-                          title: 'To personalize next',
-                          body: experience.dataCoverage.headline,
-                          tagsTitle: 'Already connected',
-                          tags: experience.dataCoverage.connectedSources
-                              .take(3)
-                              .toList(growable: false),
-                          listTitle: 'Still missing',
-                          listItems: experience.dataCoverage.missingSources
-                              .take(3)
-                              .toList(growable: false),
-                          footer: experience.dataCoverage.tailoringNote,
+                      ),
+                      const SizedBox(height: 12),
+                      _PlanEvidenceRow(
+                        label: 'Based on connected data',
+                        body: connectedSignals.isEmpty
+                            ? 'No strong connected data source is shaping this plan yet.'
+                            : connectedSignals.join(' '),
+                      ),
+                      const SizedBox(height: 12),
+                      _PlanEvidenceRow(
+                        label: 'Still uncertain',
+                        body: missingSignals.isEmpty
+                            ? 'No major data gap is blocking this week\'s plan.'
+                            : missingSignals.first,
+                        accent: AppPalette.sand.withValues(alpha: 0.88),
+                      ),
+                      if (experience.careContext.medicalGuardrail.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppPalette.sand.withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                          child: Text(
+                            experience.careContext.medicalGuardrail,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: AppPalette.ink,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.4,
+                                ),
+                          ),
                         ),
-                      ];
-
-                      if (stacked) {
-                        return Column(
-                          children: [
-                            for (var index = 0;
-                                index < cards.length;
-                                index++) ...[
-                              cards[index],
-                              if (index < cards.length - 1)
-                                const SizedBox(height: 12),
-                            ],
-                          ],
-                        );
-                      }
-
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (var index = 0;
-                              index < cards.length;
-                              index++) ...[
-                            Expanded(child: cards[index]),
-                            if (index < cards.length - 1)
-                              const SizedBox(width: 12),
-                          ],
-                        ],
-                      );
-                    },
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
-                if (experience.progressSummary.headlineTrends.isNotEmpty)
+                if (watchTrends.isNotEmpty)
                   SectionSurface(
-                    title: 'Recent watch signals',
+                    title: 'Signals worth watching',
                     subtitle:
-                        'Use these as a quick recovery read, not as another thing to overthink.',
+                        'Only the few signals that help you judge the week.',
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         final stacked = constraints.maxWidth < 760;
-                        final trends = experience.progressSummary.headlineTrends
-                            .take(3)
-                            .toList(growable: false);
-                        final children = trends
+                        final children = watchTrends
                             .map(
                               (trend) => Expanded(
                                   child: MetricTrendTile(trend: trend)),
@@ -245,7 +253,7 @@ class DashboardScreen extends StatelessWidget {
 
                         if (stacked) {
                           return Column(
-                            children: trends
+                            children: watchTrends
                                 .map(
                                   (trend) => Padding(
                                     padding: const EdgeInsets.only(bottom: 12),
@@ -285,6 +293,50 @@ class DashboardScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _PlanEvidenceRow extends StatelessWidget {
+  const _PlanEvidenceRow({
+    required this.label,
+    required this.body,
+    this.accent,
+  });
+
+  final String label;
+  final String body;
+  final Color? accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: accent ?? Colors.white.withValues(alpha: 0.68),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: AppPalette.ink,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            body,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppPalette.ink.withValues(alpha: 0.78),
+                  height: 1.45,
+                ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -336,10 +388,15 @@ class _WelcomeSourcesCard extends StatelessWidget {
           _BulletList(
             title: 'What is already moving',
             items: bookings
-                .map(
-                  (booking) =>
-                      '${booking.offerLabel} is booked for ${booking.scheduledLabel}.',
-                )
+                .map((booking) {
+                  final practical = practicalInfoForOfferCode(
+                    booking.offerCode,
+                    fallbackTitle: booking.offerLabel,
+                    fallbackFormat: booking.deliveryModel,
+                    offerType: booking.offerType,
+                  );
+                  return '${practical.title} is booked for ${booking.scheduledLabel}.';
+                })
                 .toList(growable: false),
           ),
         ],
@@ -355,6 +412,13 @@ class _BookedStepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final practical = practicalInfoForOfferCode(
+      booking.offerCode,
+      fallbackTitle: booking.offerLabel,
+      fallbackFormat: booking.deliveryModel,
+      offerType: booking.offerType,
+    );
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -386,7 +450,7 @@ class _BookedStepCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            booking.offerLabel,
+            practical.title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: AppPalette.ink,
                   fontWeight: FontWeight.w700,
@@ -399,10 +463,18 @@ class _BookedStepCard extends StatelessWidget {
                   color: AppPalette.ink.withValues(alpha: 0.74),
                 ),
           ),
-          if (booking.deliveryModel.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            '${practical.locationLabel} • ${practical.priceLabel}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppPalette.ink.withValues(alpha: 0.7),
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          if (practical.formatLabel.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              booking.deliveryModel,
+              practical.formatLabel,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppPalette.ink.withValues(alpha: 0.62),
                     fontWeight: FontWeight.w700,
@@ -411,130 +483,6 @@ class _BookedStepCard extends StatelessWidget {
           ],
         ],
       ),
-    );
-  }
-}
-
-class _DashboardDetailCard extends StatelessWidget {
-  const _DashboardDetailCard({
-    required this.title,
-    required this.body,
-    this.tagsTitle,
-    this.tags = const <String>[],
-    this.listTitle,
-    this.listItems = const <String>[],
-    this.footer,
-    this.footerColor,
-  });
-
-  final String title;
-  final String body;
-  final String? tagsTitle;
-  final List<String> tags;
-  final String? listTitle;
-  final List<String> listItems;
-  final String? footer;
-  final Color? footerColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppPalette.ink,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            body,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppPalette.ink.withValues(alpha: 0.76),
-                  height: 1.45,
-                ),
-          ),
-          if (tagsTitle != null && tags.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _InfoTagWrap(title: tagsTitle!, items: tags),
-          ],
-          if (listTitle != null && listItems.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _BulletList(title: listTitle!, items: listItems),
-          ],
-          if (footer != null && footer!.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: footerColor ?? AppPalette.mint.withValues(alpha: 0.32),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Text(
-                footer!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppPalette.ink,
-                      fontWeight: FontWeight.w600,
-                      height: 1.4,
-                    ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoTagWrap extends StatelessWidget {
-  const _InfoTagWrap({required this.title, required this.items});
-
-  final String title;
-  final List<String> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppPalette.ink,
-              ),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: items
-              .map(
-                (item) => Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.84),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Text(item),
-                ),
-              )
-              .toList(growable: false),
-        ),
-      ],
     );
   }
 }
@@ -583,4 +531,14 @@ class _BulletList extends StatelessWidget {
       ],
     );
   }
+}
+
+String _firstSentence(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return '';
+  }
+
+  final match = RegExp(r'^.*?[.!?](?:\s|$)').firstMatch(trimmed);
+  return match == null ? trimmed : match.group(0)!.trim();
 }

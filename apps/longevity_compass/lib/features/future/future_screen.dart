@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../app/app_theme.dart';
 import '../../core/models/experience_models.dart';
+import '../../core/presentation/customer_facing_content.dart';
 import '../../widgets/compass_components.dart';
 import '../dashboard/dashboard_controller.dart';
 
@@ -48,7 +49,7 @@ class FutureScreen extends StatelessWidget {
             .toList(growable: false);
         final recommendedOffer =
             availableOffers.isNotEmpty ? availableOffers.first : null;
-        final otherOffers = availableOffers.skip(1).take(3).toList(
+        final otherOffers = availableOffers.skip(1).take(2).toList(
               growable: false,
             );
 
@@ -58,12 +59,21 @@ class FutureScreen extends StatelessWidget {
             ScreenHeader(
               eyebrow: 'Support',
               title: controller.isWelcomeJourney
-                  ? 'Choose the first real step that gets you moving.'
-                  : 'Choose the next support that actually helps.',
+                  ? 'Choose one useful first step.'
+                  : 'Support worth acting on.',
               subtitle: controller.isWelcomeJourney
-                  ? 'For a new customer, the most useful support is one clear visit, screening, or baseline step.'
-                  : 'These options are filtered to the services that still fit your medical plan and current recovery stage.',
+                  ? 'A first visit or baseline test is only worth it if it clarifies what happens next.'
+                  : 'These options should help you make a clearer next decision, not just add more stuff.',
             ),
+            if (recommendedOffer != null) ...[
+              const SizedBox(height: 24),
+              SectionSurface(
+                title: 'How to choose',
+                subtitle:
+                    'Pick the option that creates the clearest next decision.',
+                child: _SupportDecisionGuide(offer: recommendedOffer),
+              ),
+            ],
             if (bookedOffers.isNotEmpty) ...[
               const SizedBox(height: 24),
               SectionSurface(
@@ -88,8 +98,8 @@ class FutureScreen extends StatelessWidget {
               SectionSurface(
                 title: 'Best next step',
                 subtitle: controller.isWelcomeJourney
-                    ? 'Start with one clinician-led step or diagnostic that makes the blank slate more concrete.'
-                    : 'Start with one clinic action that fits the current plan and recovery stage.',
+                    ? 'Start with one step that turns the blank slate into something concrete.'
+                    : 'Start with the one clinic action that best fits the current plan.',
                 child: OfferTile(
                   offer: recommendedOffer,
                   highlight: true,
@@ -108,8 +118,8 @@ class FutureScreen extends StatelessWidget {
               SectionSurface(
                 title: 'Also available now',
                 subtitle: controller.isWelcomeJourney
-                    ? 'These are good second steps once you have one real starting point in place.'
-                    : 'These still make sense right now, but they do not need to be first.',
+                    ? 'These are second steps once you have a real starting point.'
+                    : 'These still make sense, but they do not need to be first.',
                 child: Column(
                   children: [
                     for (var index = 0;
@@ -139,6 +149,100 @@ class FutureScreen extends StatelessWidget {
   }
 }
 
+class _SupportDecisionGuide extends StatelessWidget {
+  const _SupportDecisionGuide({required this.offer});
+
+  final OfferOpportunity offer;
+
+  @override
+  Widget build(BuildContext context) {
+    final dataSignals = customerFriendlyOfferEvidence(offer.dataUsed)
+        .take(3)
+        .toList(growable: false);
+    final missingSignals = customerFriendlyMissingData(offer.missingData);
+    final practical = practicalInfoForOffer(offer);
+
+    return Column(
+      children: [
+        _GuidePoint(
+          title: 'Why this one leads',
+          body: offer.whyNow,
+        ),
+        const SizedBox(height: 12),
+        _GuidePoint(
+          title: 'What good looks like',
+          body: offer.expectedOutcome,
+        ),
+        const SizedBox(height: 12),
+        _GuidePoint(
+          title: 'What it is based on',
+          body: dataSignals.isEmpty
+              ? 'This is still a starter recommendation.'
+              : dataSignals.join(' • '),
+        ),
+        const SizedBox(height: 12),
+        _GuidePoint(
+          title: 'Practical details',
+          body:
+              '${practical.priceLabel} • ${practical.locationLabel} • ${practical.clinicianLabel}',
+        ),
+        if (offer.missingData.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _GuidePoint(
+            title: 'What would sharpen it',
+            body: missingSignals.first,
+            accent: AppPalette.sand.withValues(alpha: 0.88),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _GuidePoint extends StatelessWidget {
+  const _GuidePoint({
+    required this.title,
+    required this.body,
+    this.accent,
+  });
+
+  final String title;
+  final String body;
+  final Color? accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: accent ?? Colors.white.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: AppPalette.ink,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            body,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppPalette.ink.withValues(alpha: 0.78),
+                  height: 1.45,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _BookedSupportCard extends StatelessWidget {
   const _BookedSupportCard({required this.booking});
 
@@ -146,6 +250,13 @@ class _BookedSupportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final practical = practicalInfoForOfferCode(
+      booking.offerCode,
+      fallbackTitle: booking.offerLabel,
+      fallbackFormat: booking.deliveryModel,
+      offerType: booking.offerType,
+    );
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -172,7 +283,7 @@ class _BookedSupportCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            booking.offerLabel,
+            practical.title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: AppPalette.ink,
                   fontWeight: FontWeight.w700,
@@ -185,10 +296,18 @@ class _BookedSupportCard extends StatelessWidget {
                   color: AppPalette.ink.withValues(alpha: 0.74),
                 ),
           ),
-          if (booking.deliveryModel.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            '${practical.locationLabel} • ${practical.priceLabel}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppPalette.ink.withValues(alpha: 0.7),
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          if (practical.formatLabel.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              booking.deliveryModel,
+              practical.formatLabel,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppPalette.ink.withValues(alpha: 0.64),
                     fontWeight: FontWeight.w700,

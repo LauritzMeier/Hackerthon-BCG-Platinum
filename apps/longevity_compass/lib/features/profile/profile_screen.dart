@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../app/app_theme.dart';
+import '../../core/presentation/customer_facing_content.dart';
 import '../../widgets/compass_components.dart';
 import '../dashboard/dashboard_controller.dart';
 
@@ -48,7 +49,10 @@ class ProfileScreen extends StatelessWidget {
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  _StatCard(label: 'Patient ID', value: profile.patientId),
+                  _StatCard(
+                    label: 'Customer',
+                    value: customerDisplayNameForPatientId(profile.patientId),
+                  ),
                   _StatCard(label: 'Country', value: profile.country),
                   _StatCard(label: 'Age', value: '${profile.age}'),
                   _StatCard(label: 'Sex', value: profile.sex),

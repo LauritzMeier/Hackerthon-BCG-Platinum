@@ -1,4 +1,5 @@
 import '../models/experience_models.dart';
+import '../presentation/customer_facing_content.dart';
 
 class LocalCoachReplyService {
   const LocalCoachReplyService();
@@ -21,6 +22,20 @@ class LocalCoachReplyService {
     final isWelcomeJourney = customerProfile?.isWelcomeJourney ?? false;
     final nextBooking =
         supportBookings.isNotEmpty ? supportBookings.first : null;
+    final recommendedOfferTitle = recommendedOffer == null
+        ? ''
+        : practicalInfoForOffer(recommendedOffer).title;
+    final recommendedMissingData = recommendedOffer == null
+        ? const <String>[]
+        : customerFriendlyMissingData(recommendedOffer.missingData);
+    final nextBookingTitle = nextBooking == null
+        ? ''
+        : practicalInfoForOfferCode(
+            nextBooking.offerCode,
+            fallbackTitle: nextBooking.offerLabel,
+            fallbackFormat: nextBooking.deliveryModel,
+            offerType: nextBooking.offerType,
+          ).title;
 
     var reply =
         'The clearest focus right now is ${focus.pillarName.toLowerCase()}. '
@@ -29,8 +44,7 @@ class LocalCoachReplyService {
 
     if (isWelcomeJourney) {
       reply =
-          'You are still in the setup stage, so the best next step is to keep this simple. '
-          'Connect one useful source, tell me what outcome matters most to you, and I can guide you from there.';
+          'Start simple: tell me the outcome you want first, then connect the one source that will sharpen that answer most.';
 
       if (_containsAny(lowerMessage, const [
         'what can you do',
@@ -39,8 +53,8 @@ class LocalCoachReplyService {
         'new here',
       ])) {
         reply =
-            'I can help you choose the first data source to connect, explain what each clinic offer is for, and keep the first week simple. '
-            'A smartwatch or your last doctor summary is usually enough to get started.';
+            'I can help you choose one starting goal, one useful data source, and one clinic step if you want clinician help early. '
+            'A smartwatch or your last doctor summary is usually enough to get to the first useful answer.';
       } else if (_containsAny(lowerMessage, const [
         'watch',
         'wearable',
@@ -48,8 +62,8 @@ class LocalCoachReplyService {
         'data source',
       ])) {
         reply =
-            'The fastest first connection is usually a smartwatch or ring because it starts showing sleep, movement, and recovery trends quickly. '
-            'If you already have active medical care, adding your last doctor summary is the next best thing.';
+            'The fastest first connection is usually a smartwatch or ring because it gives the app real recovery and movement signal quickly. '
+            'If you already have active medical care, your last doctor summary is the next best connection.';
       } else if (_containsAny(lowerMessage, const [
         'book',
         'visit',
@@ -59,11 +73,11 @@ class LocalCoachReplyService {
       ])) {
         if (nextBooking != null) {
           reply =
-              'You already booked ${nextBooking.offerLabel} for ${nextBooking.scheduledLabel}. '
+              'You already booked $nextBookingTitle for ${nextBooking.scheduledLabel}. '
               'That means the smartest next step is to connect one useful source before that appointment if you can.';
         } else if (recommendedOffer != null) {
           reply =
-              'The clearest first support option is ${recommendedOffer.offerLabel}. '
+              'The clearest first support option is $recommendedOfferTitle. '
               '${recommendedOffer.summary}';
         }
       }
@@ -124,10 +138,10 @@ class LocalCoachReplyService {
     ])) {
       if (recommendedOffer != null) {
         reply =
-            'The best next support option right now is ${recommendedOffer.offerLabel}. '
+            'The best next support option right now is $recommendedOfferTitle. '
             '${recommendedOffer.summary} '
             '${recommendedOffer.whyNow} '
-            '${recommendedOffer.missingData.isNotEmpty ? 'To tailor it further, ${recommendedOffer.missingData.first}.' : ''}';
+            '${recommendedMissingData.isNotEmpty ? 'To tailor it further, ${recommendedMissingData.first}.' : ''}';
       }
     } else if (_containsAny(lowerMessage, const [
       'week',

@@ -2,16 +2,10 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/firebase/firestore_chat_service.dart';
 import '../../core/models/experience_models.dart';
+import '../../core/presentation/customer_facing_content.dart';
 import '../../core/services/experience_repository.dart';
 
 class DashboardController extends ChangeNotifier {
-  static const Map<String, String> _loginAliases = <String, String>{
-    'patient0': 'PT0000',
-    'patient1': 'PT0001',
-    'pt0000': 'PT0000',
-    'pt0001': 'PT0001',
-  };
-
   DashboardController({
     required ExperienceRepository repository,
   }) : _repository = repository;
@@ -150,30 +144,10 @@ class DashboardController extends ChangeNotifier {
 
   int get loginSequence => _loginSequence;
 
-  List<String> get supportedLoginUsernames =>
-      _loginAliases.keys.where((value) => value.startsWith('patient')).toList();
-
-  String get selectedUsername =>
-      usernameForPatientId(selectedPatientId) ?? 'patient1';
-
-  String? usernameForPatientId(String? patientId) {
-    if (patientId == null) {
-      return null;
-    }
-    for (final entry in _loginAliases.entries) {
-      if (entry.value == patientId && entry.key.startsWith('patient')) {
-        return entry.key;
-      }
-    }
-    return null;
-  }
+  List<String> get supportedDemoPatientIds => demoPatientIdsInOrder;
 
   String? patientIdForUsername(String username) {
-    final normalized = username.toLowerCase().replaceAll(
-          RegExp(r'[\s_-]+'),
-          '',
-        );
-    return _loginAliases[normalized];
+    return patientIdForCustomerInput(username);
   }
 
   bool hasPatient(String patientId) {
@@ -181,20 +155,21 @@ class DashboardController extends ChangeNotifier {
   }
 
   Future<bool> loginWithUsername(String username) async {
-    final normalized = username.toLowerCase().replaceAll(
-          RegExp(r'[\s_-]+'),
-          '',
-        );
     final patientId = patientIdForUsername(username);
     if (patientId == null) {
-      errorMessage = 'Use `patient0` or `patient1` to log in.';
+      errorMessage =
+          'Use Mila Neumann or Daniel Moreau to log in. Demo aliases still work too.';
       notifyListeners();
       return false;
     }
 
+    return loginWithPatientId(patientId);
+  }
+
+  Future<bool> loginWithPatientId(String patientId) async {
     if (!hasPatient(patientId)) {
       errorMessage =
-          '`${usernameForPatientId(patientId) ?? normalized}` is not available in this build yet.';
+          '${customerDisplayNameForPatientId(patientId)} is not available in this build yet.';
       notifyListeners();
       return false;
     }

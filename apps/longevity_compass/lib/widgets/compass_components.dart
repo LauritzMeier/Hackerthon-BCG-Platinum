@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../app/app_theme.dart';
 import '../core/models/experience_models.dart';
+import '../core/presentation/customer_facing_content.dart';
 
 class ScreenHeader extends StatelessWidget {
   const ScreenHeader({
@@ -167,12 +168,8 @@ class CompassHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final ageGap = experience.profileSummary.ageGapYears;
-    final ageText = ageGap == null
-        ? 'Biological age estimate not available yet'
-        : ageGap > 0
-            ? '${ageGap.toStringAsFixed(1)} years above chronological age'
-            : '${ageGap.abs().toStringAsFixed(1)} years below chronological age';
+    final sourceLabels = _heroSourceLabels(experience);
+    final showBiologicalAge = _hasReliableBiologicalAgeEstimate(experience);
 
     return Container(
       padding: const EdgeInsets.all(28),
@@ -194,8 +191,8 @@ class CompassHeroCard extends StatelessWidget {
             children: [
               DirectionBadge(experience.compass.overallDirection),
               _HeroPill(
-                label: 'This week',
-                value: experience.weeklyPlan.primaryFocus.pillarName,
+                label: 'Precision',
+                value: experience.dataCoverage.confidenceLabel,
               ),
             ],
           ),
@@ -217,28 +214,94 @@ class CompassHeroCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
+          Text(
+            'Using now',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
           Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _HeroMetric(
-                label: 'Chronological age',
-                value: '${experience.compass.chronologicalAge}',
+            spacing: 10,
+            runSpacing: 10,
+            children: sourceLabels
+                .map(
+                  (label) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(
+                      label,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Text(
+              showBiologicalAge
+                  ? 'Estimated biological age: ${experience.compass.estimatedBiologicalAge!.toStringAsFixed(1)}. We are showing it because enough pillar data is connected.'
+                  : 'Biological age is hidden for now. There is not enough reliable signal yet to show it precisely.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.88),
+                height: 1.4,
               ),
-              _HeroMetric(
-                label: 'Estimated biological age',
-                value: experience.compass.estimatedBiologicalAge == null
-                    ? 'n/a'
-                    : experience.compass.estimatedBiologicalAge!
-                        .toStringAsFixed(1),
-              ),
-              _HeroMetric(label: 'Age gap', value: ageText),
-            ],
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+bool _hasReliableBiologicalAgeEstimate(ExperienceSnapshot experience) {
+  if (experience.compass.estimatedBiologicalAge == null) {
+    return false;
+  }
+
+  final precisePillars = experience.compass.pillars
+      .where((pillar) => pillar.hasEnoughData)
+      .length;
+  return precisePillars >= 4;
+}
+
+List<String> _heroSourceLabels(ExperienceSnapshot experience) {
+  final labels = <String>[];
+  for (final source in experience.dataCoverage.connectedSources) {
+    final lower = source.toLowerCase();
+    if (lower.contains('smartwatch') || lower.contains('wearable')) {
+      labels.add('Smartwatch trends');
+    } else if (lower.contains('medical record') || lower.contains('doctor')) {
+      labels.add('Doctor context');
+    } else if (lower.contains('survey')) {
+      labels.add('Lifestyle survey');
+    } else if (lower.contains('meal')) {
+      labels.add('Meal logging');
+    }
+  }
+
+  if (labels.isEmpty) {
+    labels.add('Limited connected data');
+  }
+
+  return labels.toSet().take(3).toList(growable: false);
 }
 
 class CompassRadarCard extends StatefulWidget {
@@ -1086,11 +1149,15 @@ class OfferTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final practical = practicalInfoForOffer(offer);
     final foreground = highlight ? Colors.white : AppPalette.ink;
     final secondary = highlight
         ? Colors.white.withValues(alpha: 0.84)
         : AppPalette.ink.withValues(alpha: 0.72);
-    final previewItems = offer.includes.take(2).toList(growable: false);
+    final evidencePreview = customerFriendlyOfferEvidence(offer.dataUsed)
+        .take(2)
+        .toList(growable: false);
+    final missingPreview = customerFriendlyMissingData(offer.missingData);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1114,33 +1181,40 @@ class OfferTile extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _MiniBadge(
-                label: highlight ? 'Best next step' : offer.category,
+                label: highlight ? 'Best next step' : practical.categoryLabel,
                 background: highlight
                     ? Colors.white.withValues(alpha: 0.14)
                     : AppPalette.mint.withValues(alpha: 0.7),
                 foreground: highlight ? Colors.white : AppPalette.ink,
               ),
-              if (offer.deliveryModel.isNotEmpty)
+              if (practical.locationShortLabel.isNotEmpty)
                 _MiniBadge(
-                  label: offer.deliveryModel,
+                  label: practical.locationShortLabel,
                   background: highlight
                       ? Colors.white.withValues(alpha: 0.12)
                       : AppPalette.sand.withValues(alpha: 0.9),
                   foreground: highlight ? Colors.white : AppPalette.ink,
                 ),
-              if (offer.timeCommitment.isNotEmpty)
+              if (practical.priceLabel.isNotEmpty)
                 _MiniBadge(
-                  label: offer.timeCommitment,
+                  label: practical.priceLabel,
                   background: highlight
                       ? Colors.white.withValues(alpha: 0.12)
                       : Colors.white,
                   foreground: highlight ? Colors.white : AppPalette.ink,
                 ),
+              _MiniBadge(
+                label: _offerReadinessLabel(offer),
+                background: highlight
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : AppPalette.canvas.withValues(alpha: 0.88),
+                foreground: highlight ? Colors.white : AppPalette.ink,
+              ),
             ],
           ),
           const SizedBox(height: 14),
           Text(
-            offer.offerLabel,
+            practical.title,
             style: theme.textTheme.headlineSmall?.copyWith(
               color: foreground,
               fontWeight: FontWeight.w700,
@@ -1155,33 +1229,47 @@ class OfferTile extends StatelessWidget {
             ),
           ),
           if (offer.whyNow.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              offer.whyNow,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: secondary,
-                height: 1.4,
-              ),
+            const SizedBox(height: 16),
+            _OfferDecisionRow(
+              label: 'Why this now',
+              text: offer.whyNow,
+              foreground: secondary,
+              highlight: highlight,
             ),
           ],
-          if (previewItems.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(
-              'What you get',
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: foreground,
-                fontWeight: FontWeight.w700,
-              ),
+          if (offer.expectedOutcome.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _OfferDecisionRow(
+              label: 'Expected result',
+              text: offer.expectedOutcome,
+              foreground: secondary,
+              highlight: highlight,
             ),
-            const SizedBox(height: 8),
-            for (final item in previewItems) ...[
-              _OfferPreviewPoint(
-                text: item,
-                foreground: secondary,
-                highlight: highlight,
-              ),
-              if (item != previewItems.last) const SizedBox(height: 8),
-            ],
+          ],
+          if (evidencePreview.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _OfferDecisionRow(
+              label: 'Based on',
+              text: evidencePreview.join(' • '),
+              foreground: secondary,
+              highlight: highlight,
+            ),
+          ],
+          const SizedBox(height: 12),
+          _OfferDecisionRow(
+            label: 'Practical',
+            text: '${practical.formatLabel} • ${practical.locationLabel}',
+            foreground: secondary,
+            highlight: highlight,
+          ),
+          if (highlight && offer.missingData.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _OfferDecisionRow(
+              label: 'Sharper later with',
+              text: missingPreview.first,
+              foreground: secondary,
+              highlight: highlight,
+            ),
           ],
           const SizedBox(height: 18),
           Row(
@@ -1208,7 +1296,7 @@ class OfferTile extends StatelessWidget {
                   onBook: onBook,
                 ),
                 style: TextButton.styleFrom(foregroundColor: foreground),
-                child: const Text('Details'),
+                child: const Text('Why this'),
               ),
             ],
           ),
@@ -1218,13 +1306,15 @@ class OfferTile extends StatelessWidget {
   }
 }
 
-class _OfferPreviewPoint extends StatelessWidget {
-  const _OfferPreviewPoint({
+class _OfferDecisionRow extends StatelessWidget {
+  const _OfferDecisionRow({
+    required this.label,
     required this.text,
     required this.foreground,
     required this.highlight,
   });
 
+  final String label;
   final String text;
   final Color foreground;
   final bool highlight;
@@ -1237,23 +1327,42 @@ class _OfferPreviewPoint extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Icon(
-            Icons.check_circle_rounded,
+            Icons.circle,
             size: 16,
             color: highlight ? Colors.white : AppPalette.forest,
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            text,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: foreground, height: 1.4),
+          child: RichText(
+            text: TextSpan(
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: foreground, height: 1.4),
+              children: [
+                TextSpan(
+                  text: '$label: ',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                TextSpan(text: text),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
+}
+
+String _offerReadinessLabel(OfferOpportunity offer) {
+  if (offer.missingData.isEmpty) {
+    return 'Ready now';
+  }
+  if (offer.offerType == 'supplement' || offer.offerType == 'starter') {
+    return 'Context first';
+  }
+  return 'Sharper with more data';
 }
 
 class _OfferDetailSheet extends StatelessWidget {
@@ -1276,6 +1385,9 @@ class _OfferDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final practical = practicalInfoForOffer(offer);
+    final friendlyEvidence = customerFriendlyOfferEvidence(offer.dataUsed);
+    final friendlyMissing = customerFriendlyMissingData(offer.missingData);
 
     return SafeArea(
       child: Padding(
@@ -1299,19 +1411,21 @@ class _OfferDetailSheet extends StatelessWidget {
                         children: [
                           _MiniBadge(
                             label:
-                                highlight ? 'Best next step' : offer.category,
+                                highlight
+                                    ? 'Best next step'
+                                    : practical.categoryLabel,
                             background: AppPalette.mint.withValues(alpha: 0.85),
                             foreground: AppPalette.ink,
                           ),
-                          if (offer.deliveryModel.isNotEmpty)
+                          if (practical.locationShortLabel.isNotEmpty)
                             _MiniBadge(
-                              label: offer.deliveryModel,
+                              label: practical.locationShortLabel,
                               background: AppPalette.sand,
                               foreground: AppPalette.ink,
                             ),
-                          if (offer.timeCommitment.isNotEmpty)
+                          if (practical.priceLabel.isNotEmpty)
                             _MiniBadge(
-                              label: offer.timeCommitment,
+                              label: practical.priceLabel,
                               background: Colors.white,
                               foreground: AppPalette.ink,
                             ),
@@ -1326,7 +1440,7 @@ class _OfferDetailSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  offer.offerLabel,
+                  practical.title,
                   style: theme.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: AppPalette.ink,
@@ -1354,13 +1468,17 @@ class _OfferDetailSheet extends StatelessWidget {
                   items: offer.includes,
                 ),
                 _OfferDetailListSection(
-                  title: 'What data we used',
-                  items: offer.dataUsed,
+                  title: 'What this is based on',
+                  items: friendlyEvidence,
+                ),
+                _OfferDetailListSection(
+                  title: 'Practical details',
+                  items: practical.detailLines,
                 ),
                 if (offer.missingData.isNotEmpty)
                   _OfferDetailListSection(
                     title: 'What would make this even sharper',
-                    items: offer.missingData,
+                    items: friendlyMissing,
                   ),
                 _OfferDetailListSection(
                   title: 'What the first week looks like',
@@ -1453,27 +1571,29 @@ class _OfferActionSheetState extends State<_OfferActionSheet> {
   }
 
   String get _body {
+    final practical = practicalInfoForOffer(widget.offer);
     switch (widget.offer.offerType) {
       case 'appointment':
       case 'appointment_prep':
-        return 'This would route you to the clinic team for ${widget.offer.offerLabel.toLowerCase()} and confirm the right visit format.';
+        return 'This books ${practical.title.toLowerCase()} with the clinic team and confirms the final visit format.';
       case 'diagnostic':
-        return 'This would hand you off to booking for the right lab or diagnostic slot.';
+        return 'This books the right lab slot and makes sure the clinic team has the results for the next decision.';
       case 'program':
       case 'coaching':
-        return 'This would start the intake process so the care team can tailor the plan to your current recovery stage.';
+        return 'This starts a guided intake so the plan matches your current recovery stage instead of staying generic.';
       case 'supplement':
-        return 'This would create a clinician-reviewed supplement discussion instead of leaving you to guess on your own.';
+        return 'This sets up a clinician-reviewed supplement discussion so you do not have to guess what is safe or useful.';
       case 'starter':
-        return 'This would begin a lighter-weight plan inside the app and set up the first week.';
+        return 'This starts a light in-app plan so you can build signal before committing to a clinic visit.';
       default:
-        return 'This would move you into the next guided support step.';
+        return 'This moves you into the next guided support step.';
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final practical = practicalInfoForOffer(widget.offer);
     final nextSteps = widget.offer.firstWeek.isNotEmpty
         ? widget.offer.firstWeek.take(3).toList(growable: false)
         : widget.offer.includes.take(3).toList(growable: false);
@@ -1513,7 +1633,7 @@ class _OfferActionSheetState extends State<_OfferActionSheet> {
                   ],
                 ),
                 Text(
-                  widget.offer.offerLabel,
+                  practical.title,
                   style: theme.textTheme.titleLarge?.copyWith(
                     color: AppPalette.ink,
                     fontWeight: FontWeight.w700,
@@ -1528,28 +1648,32 @@ class _OfferActionSheetState extends State<_OfferActionSheet> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                if (widget.offer.deliveryModel.isNotEmpty ||
-                    widget.offer.timeCommitment.isNotEmpty)
+                if (practical.locationShortLabel.isNotEmpty ||
+                    practical.priceLabel.isNotEmpty)
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      if (widget.offer.deliveryModel.isNotEmpty)
+                      if (practical.locationShortLabel.isNotEmpty)
                         _MiniBadge(
-                          label: widget.offer.deliveryModel,
+                          label: practical.locationShortLabel,
                           background: AppPalette.mint.withValues(alpha: 0.7),
                           foreground: AppPalette.ink,
                         ),
-                      if (widget.offer.timeCommitment.isNotEmpty)
+                      if (practical.priceLabel.isNotEmpty)
                         _MiniBadge(
-                          label: widget.offer.timeCommitment,
+                          label: practical.priceLabel,
                           background: AppPalette.sand,
                           foreground: AppPalette.ink,
                         ),
                     ],
                   ),
+                const SizedBox(height: 18),
+                _OfferDetailListSection(
+                  title: 'Practical details',
+                  items: practical.detailLines,
+                ),
                 if (nextSteps.isNotEmpty) ...[
-                  const SizedBox(height: 22),
                   _OfferDetailListSection(
                     title: 'What happens next',
                     items: nextSteps,
@@ -1629,7 +1753,7 @@ class _OfferActionSheetState extends State<_OfferActionSheet> {
                                       .showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        'Booked ${widget.offer.offerLabel} for ${selectedSlot.label}.',
+                                        'Booked ${practical.title} for ${selectedSlot.label}.',
                                       ),
                                     ),
                                   );
@@ -1671,6 +1795,7 @@ class _OfferSlotOption {
 
 List<_OfferSlotOption> _buildOfferSlots(OfferOpportunity offer) {
   final now = DateTime.now();
+  final practical = practicalInfoForOffer(offer);
   final baseHour = switch (offer.offerType) {
     'diagnostic' => 8,
     'program' || 'coaching' => 10,
@@ -1694,7 +1819,7 @@ List<_OfferSlotOption> _buildOfferSlots(OfferOpportunity offer) {
       days == offsets.first ? 0 : 30,
     );
     return _OfferSlotOption(
-      label: formatter.format(scheduledFor),
+      label: '${formatter.format(scheduledFor)} • ${practical.locationShortLabel}',
       scheduledFor: scheduledFor,
     );
   }).toList(growable: false);
@@ -2059,44 +2184,6 @@ _BadgeAppearance _appearanceForState(String raw) {
         foreground: AppPalette.coral,
         icon: Icons.track_changes_rounded,
       );
-  }
-}
-
-class _HeroMetric extends StatelessWidget {
-  const _HeroMetric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 180),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.76),
-                ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
