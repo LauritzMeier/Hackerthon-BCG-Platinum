@@ -55,7 +55,7 @@ def analyze_six_pillars(patient_id: str) -> Dict[str, Any]:
 
 
 def explain_pillar(patient_id: str, pillar_id: str) -> Dict[str, Any]:
-    """Explain one longevity pillar using CSV and Firestore context.
+    """Explain one longevity pillar using curated warehouse and Firestore context.
 
     Args:
         patient_id: Patient identifier, e.g. PT0001.
@@ -93,7 +93,7 @@ root_agent = Agent(
     model=os.getenv("ADK_MODEL", "gemini-2.5-flash-lite"),
     description=(
         "Patient-facing coach agent for the Longevity Compass MVP. "
-        "It analyzes and explains six longevity pillars using raw CSV data plus "
+        "It analyzes and explains six longevity pillars using curated warehouse data plus "
         "patient context from Firestore. A Firebase startup write is performed first."
     ),
     instruction=(
@@ -102,7 +102,7 @@ root_agent = Agent(
         "Use tool evidence to generate personalized explanations with trade-offs and "
         "next-best actions. Cite which measured data points support each claim. "
         "Always include one short uncertainty statement, especially when Firebase "
-        "context is missing or conflicting with CSV signals. "
+        "context is missing or conflicting with warehouse signals. "
         "Prioritize low-friction lifestyle recommendations and transparent caveats. "
         "If risk appears elevated, suggest clinician follow-up without diagnosing. "
         f"Startup Firebase test result: {_startup_result}."

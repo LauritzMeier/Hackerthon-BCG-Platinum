@@ -28,10 +28,23 @@ The six pillars are:
 
 Analysis combines:
 
-- `data/raw/ehr_records.csv`
-- `data/raw/lifestyle_survey.csv`
-- `data/raw/wearable_telemetry_1.csv`
-- Firestore patient documents (if present) from common collections
+- curated warehouse fields aligned to [sql/schema_reference.sql](/home/tengen/Code/Hackerthon-BCG-Platinum/sql/schema_reference.sql)
+- especially `curated.patient_profile`, `curated.patient_metrics`, and `curated.coach_context`
+- Firestore patient documents (if present) from the overview-driven agent collections
+
+## Lazy-seed Firestore for the agent
+
+From repo root (requires local warehouse built and Firebase credentials):
+
+```bash
+python3 scripts/seed_agent_firestore.py --project YOUR_PROJECT_ID --patient-id PT0001
+```
+
+- Writes one document per collection (`patients`, `longevity_data_overview`, `pillar_mappings`, `actionable_opportunities`, `engagement_queries`) with **document id = patient id**.
+- The Firestore shape mirrors [data/data_overview.md](/home/tengen/Code/Hackerthon-BCG-Platinum/data/data_overview.md) and uses the naming from [sql/schema_reference.sql](/home/tengen/Code/Hackerthon-BCG-Platinum/sql/schema_reference.sql) for warehouse-backed fields.
+- **Lazy default:** skips any document that already exists; use `--force` to overwrite.
+- `--dry-run` prints planned writes without touching Firestore.
+- Omit `--patient-id` to seed the first `--limit` patients from the warehouse (default 25).
 
 ## What happens first
 
@@ -108,4 +121,66 @@ Example stream call:
 curl -N -X POST http://127.0.0.1:8080/chat/stream \
   -H "Content-Type: application/json" \
   -d '{"patient_id":"PT0001","message":"How is my sleep pillar doing?"}'
+```
+
+## Infrastructure as Code for deployment
+
+Use the repo scripts so IAM and runtime config are reproducible and not manual.
+
+1) Bootstrap service account + cross-project Firestore IAM:
+
+```bash
+./scripts/bootstrap_agent_infra.sh \
+  ai-hack26ham-435 \
+  ai-hack26ham-435 \
+  europe-west1 \
+  longevity-agent-sa
+```
+
+2) Deploy the agent with fixed runtime identity + env vars:
+
+```bash
+./scripts/deploy_agent.sh \
+  ai-hack26ham-435 \
+  ai-hack26ham-435 \
+  europe-west1 \
+  longevity-agent \
+  longevity-agent-sa \
+  "longevity-compass-firestore"
+```
+
+3) Verify health, batch chat, and stream chat:
+
+```bash
+./scripts/verify_agent.sh \
+  https://longevity-agent-102290354167.europe-west1.run.app \
+  PT0001
+```
+
+## Debug flags and diagnostics
+
+Enable verbose runtime diagnostics in Cloud Run:
+
+```bash
+--set-env-vars AGENT_DEBUG=true
+```
+
+Additional targeted flags:
+
+```bash
+--set-env-vars AGENT_DEBUG_FIRESTORE=true,AGENT_DEBUG_CHAT=true
+```
+
+With debug enabled:
+
+- logs include resolved Firestore project/database during client initialization
+- Firestore lookups capture `lookup_status`, `failure_stage`, per-collection read attempts, and exception details
+- `/chat` and `/chat/stream` can return top-level debug payloads when `include_debug=true` or `AGENT_DEBUG_CHAT=true`
+- `GET /debug/runtime` returns non-secret env wiring diagnostics
+- `GET /debug/firebase/{patient_id}` returns patient-scoped Firestore lookup diagnostics
+
+For the verification script, enable debug output with:
+
+```bash
+AGENT_VERIFY_DEBUG=1 ./scripts/verify_agent.sh https://your-service-url PT0001
 ```

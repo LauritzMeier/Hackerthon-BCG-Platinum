@@ -5,11 +5,14 @@ from __future__ import annotations
 import csv
 from datetime import datetime
 from functools import lru_cache
+import os
 from pathlib import Path
 from statistics import mean
 from typing import Any, Dict, List, Optional
 
 from .firebase_client import get_patient_firebase_context
+from longevity_mvp.bootstrap import ensure_local_warehouse
+from longevity_mvp.repository import WarehouseRepository
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"
 EHR_FILE = DATA_DIR / "ehr_records.csv"
@@ -24,6 +27,91 @@ PILLARS = [
     "nutrition_quality",
     "mental_resilience",
 ]
+
+
+@lru_cache(maxsize=1)
+def _repository() -> WarehouseRepository:
+    ensure_local_warehouse()
+    return WarehouseRepository()
+
+
+def _flag_enabled(*names: str) -> bool:
+    return any(os.getenv(name, "").lower() in {"1", "true", "yes", "on"} for name in names)
+
+
+def _is_firestore_debug_enabled() -> bool:
+    return _flag_enabled("AGENT_DEBUG", "AGENT_DEBUG_FIRESTORE")
+
+
+def _firebase_debug_suffix(firebase_context: Dict[str, Any]) -> str:
+    if not _is_firestore_debug_enabled():
+        return ""
+    parts: List[str] = []
+    if firebase_context.get("lookup_status"):
+        parts.append(f"lookup_status={firebase_context['lookup_status']}")
+    if firebase_context.get("failure_stage"):
+        parts.append(f"failure_stage={firebase_context['failure_stage']}")
+    if firebase_context.get("warning"):
+        parts.append(f"warning={firebase_context['warning']}")
+    return " | ".join(parts)
+
+
+def _summarize_firebase_context(firebase_context: Dict[str, Any]) -> str:
+    if firebase_context.get("warning") and not firebase_context.get("collections_found"):
+        summary = "Firestore context unavailable; using CSV-only analysis for this response."
+        debug_suffix = _firebase_debug_suffix(firebase_context)
+        return f"{summary} Debug: {debug_suffix}." if debug_suffix else summary
+
+    normalized = firebase_context.get("normalized") or {}
+    if normalized.get("context_format") == "overview_v1":
+        pillar_count = len(normalized.get("pillar_mappings") or [])
+        opportunity_count = len(normalized.get("opportunities") or [])
+        prompt_count = len(normalized.get("engagement_prompts") or [])
+        primary_focus = normalized.get("primary_focus") or {}
+        focus_name = primary_focus.get("pillar_name")
+        parts = [
+            f"Loaded overview context with {pillar_count} pillar mappings",
+            f"{opportunity_count} actionable opportunities",
+            f"and {prompt_count} engagement prompts",
+        ]
+        summary = " ".join([" ".join(parts[:1]), " ".join(parts[1:])]).strip()
+        if focus_name:
+            summary = f"{summary}. Firestore primary focus: {focus_name}."
+        else:
+            summary = f"{summary}."
+        if firebase_context.get("warning"):
+            debug_suffix = _firebase_debug_suffix(firebase_context)
+            if debug_suffix:
+                summary = f"{summary} Firestore note: {debug_suffix}."
+            else:
+                summary = f"{summary} Firestore note: partial Firestore read."
+        return summary
+
+    if firebase_context.get("warning"):
+        summary = "Firestore context unavailable; using CSV-only analysis for this response."
+        debug_suffix = _firebase_debug_suffix(firebase_context)
+        return f"{summary} Debug: {debug_suffix}." if debug_suffix else summary
+    if not firebase_context.get("collections_found"):
+        return "No patient-specific Firestore documents found in checked collections."
+    return f"Found data in: {', '.join(firebase_context['collections_found'])}."
+
+
+def _pick_focus_prompt(firebase_context: Dict[str, Any], focus_pillar_id: str) -> Optional[Dict[str, Any]]:
+    normalized = firebase_context.get("normalized") or {}
+    prompts = normalized.get("engagement_prompts") or []
+    for prompt in prompts:
+        if focus_pillar_id in (prompt.get("derived_from_pillars") or []):
+            return prompt
+    return prompts[0] if prompts else None
+
+
+def _pick_focus_opportunity(firebase_context: Dict[str, Any], focus_pillar_id: str) -> Optional[Dict[str, Any]]:
+    normalized = firebase_context.get("normalized") or {}
+    opportunities = normalized.get("opportunities") or []
+    for opportunity in opportunities:
+        if focus_pillar_id in (opportunity.get("trigger_pillars") or []):
+            return opportunity
+    return opportunities[0] if opportunities else None
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -77,13 +165,12 @@ def _rolling_avg(values: List[float], window: int) -> float:
     return mean(values[-window:]) if len(values) >= window else mean(values)
 
 
-def _build_sleep(row: Dict[str, str], wearable_rows: List[Dict[str, str]]) -> Dict[str, Any]:
-    sleep_quality = [_safe_float(r.get("sleep_quality_score")) for r in wearable_rows]
-    sleep_hours = [_safe_float(r.get("sleep_duration_hrs")) for r in wearable_rows]
-    quality_7 = _rolling_avg(sleep_quality, 7)
-    quality_30 = _rolling_avg(sleep_quality, 30)
-    duration_7 = _rolling_avg(sleep_hours, 7)
-    duration_30 = _rolling_avg(sleep_hours, 30)
+def _build_sleep(profile: Dict[str, Any]) -> Dict[str, Any]:
+    quality_7 = _safe_float(profile.get("sleep_quality_7d_avg"))
+    quality_30 = _safe_float(profile.get("sleep_quality_30d_avg"))
+    duration_7 = _safe_float(profile.get("sleep_duration_7d_avg"))
+    duration_30 = _safe_float(profile.get("sleep_duration_30d_avg"))
+    deep_sleep_30 = _safe_float(profile.get("deep_sleep_30d_avg"))
     score = max(0.0, min(100.0, (quality_30 * 0.7) + (min(duration_30, 8.0) / 8.0 * 30.0)))
     return {
         "id": "sleep_recovery",
@@ -97,20 +184,20 @@ def _build_sleep(row: Dict[str, str], wearable_rows: List[Dict[str, str]]) -> Di
             "sleep_quality_30d_avg": round(quality_30, 1),
             "sleep_duration_7d_avg_hrs": round(duration_7, 2),
             "sleep_duration_30d_avg_hrs": round(duration_30, 2),
+            "deep_sleep_30d_avg_pct": round(deep_sleep_30, 2),
+            "sleep_satisfaction": _safe_float(profile.get("sleep_satisfaction")),
         },
-        "data_sources": ["wearable_telemetry_1.csv"],
+        "data_sources": ["curated.patient_metrics", "curated.patient_profile"],
     }
 
 
-def _build_cardio(row: Dict[str, str], wearable_rows: List[Dict[str, str]]) -> Dict[str, Any]:
-    resting_hr = [_safe_float(r.get("resting_hr_bpm")) for r in wearable_rows]
-    hrv = [_safe_float(r.get("hrv_rmssd_ms")) for r in wearable_rows]
-    hr_30 = _rolling_avg(resting_hr, 30)
-    hr_7 = _rolling_avg(resting_hr, 7)
-    hrv_30 = _rolling_avg(hrv, 30)
-    hrv_7 = _rolling_avg(hrv, 7)
-    bp_penalty = max(0.0, (_safe_float(row.get("sbp_mmhg")) - 120.0) * 0.5) + max(
-        0.0, (_safe_float(row.get("dbp_mmhg")) - 80.0) * 0.6
+def _build_cardio(profile: Dict[str, Any]) -> Dict[str, Any]:
+    hr_30 = _safe_float(profile.get("resting_hr_30d_avg"))
+    hr_7 = _safe_float(profile.get("resting_hr_7d_avg"))
+    hrv_30 = _safe_float(profile.get("hrv_30d_avg"))
+    hrv_7 = _safe_float(profile.get("hrv_7d_avg"))
+    bp_penalty = max(0.0, (_safe_float(profile.get("sbp_mmhg")) - 120.0) * 0.5) + max(
+        0.0, (_safe_float(profile.get("dbp_mmhg")) - 80.0) * 0.6
     )
     score = max(0.0, min(100.0, 100.0 - (hr_30 - 58.0) - bp_penalty + (hrv_30 * 0.35)))
     return {
@@ -125,18 +212,20 @@ def _build_cardio(row: Dict[str, str], wearable_rows: List[Dict[str, str]]) -> D
             "resting_hr_30d_avg": round(hr_30, 1),
             "hrv_7d_avg": round(hrv_7, 1),
             "hrv_30d_avg": round(hrv_30, 1),
-            "sbp_mmhg": _safe_float(row.get("sbp_mmhg")),
-            "dbp_mmhg": _safe_float(row.get("dbp_mmhg")),
+            "spo2_7d_avg_pct": round(_safe_float(profile.get("spo2_7d_avg")), 1),
+            "spo2_30d_avg_pct": round(_safe_float(profile.get("spo2_30d_avg")), 1),
+            "sbp_mmhg": _safe_float(profile.get("sbp_mmhg")),
+            "dbp_mmhg": _safe_float(profile.get("dbp_mmhg")),
         },
-        "data_sources": ["wearable_telemetry_1.csv", "ehr_records.csv"],
+        "data_sources": ["curated.patient_metrics", "curated.patient_profile"],
     }
 
 
-def _build_metabolic(row: Dict[str, str]) -> Dict[str, Any]:
-    bmi = _safe_float(row.get("bmi"))
-    hba1c = _safe_float(row.get("hba1c_pct"))
-    glucose = _safe_float(row.get("fasting_glucose_mmol"))
-    ldl = _safe_float(row.get("ldl_mmol"))
+def _build_metabolic(profile: Dict[str, Any]) -> Dict[str, Any]:
+    bmi = _safe_float(profile.get("bmi"))
+    hba1c = _safe_float(profile.get("hba1c_pct"))
+    glucose = _safe_float(profile.get("fasting_glucose_mmol"))
+    ldl = _safe_float(profile.get("ldl_mmol"))
     score = max(
         0.0,
         min(100.0, 100.0 - max(0.0, (bmi - 23) * 2.4) - max(0.0, (hba1c - 5.4) * 12.0) - max(0.0, (glucose - 5.2) * 10.0) - max(0.0, (ldl - 2.6) * 7.0)),
@@ -153,19 +242,18 @@ def _build_metabolic(row: Dict[str, str]) -> Dict[str, Any]:
             "hba1c_pct": hba1c,
             "fasting_glucose_mmol": glucose,
             "ldl_mmol": ldl,
+            "triglycerides_mmol": _safe_float(profile.get("triglycerides_mmol")),
         },
-        "data_sources": ["ehr_records.csv"],
+        "data_sources": ["curated.patient_profile"],
     }
 
 
-def _build_movement(lifestyle_row: Dict[str, str], wearable_rows: List[Dict[str, str]]) -> Dict[str, Any]:
-    steps = [_safe_float(r.get("steps")) for r in wearable_rows]
-    active = [_safe_float(r.get("active_minutes")) for r in wearable_rows]
-    steps_7 = _rolling_avg(steps, 7)
-    steps_30 = _rolling_avg(steps, 30)
-    active_7 = _rolling_avg(active, 7)
-    active_30 = _rolling_avg(active, 30)
-    exercise_weekly = _safe_float(lifestyle_row.get("exercise_sessions_weekly"))
+def _build_movement(profile: Dict[str, Any]) -> Dict[str, Any]:
+    steps_7 = _safe_float(profile.get("steps_7d_avg"))
+    steps_30 = _safe_float(profile.get("steps_30d_avg"))
+    active_7 = _safe_float(profile.get("active_minutes_7d_avg"))
+    active_30 = _safe_float(profile.get("active_minutes_30d_avg"))
+    exercise_weekly = _safe_float(profile.get("exercise_sessions_weekly"))
     score = min(100.0, (steps_30 / 9000.0) * 45 + (active_30 / 45.0) * 35 + (exercise_weekly / 5.0) * 20)
     return {
         "id": "movement_fitness",
@@ -180,16 +268,17 @@ def _build_movement(lifestyle_row: Dict[str, str], wearable_rows: List[Dict[str,
             "active_minutes_7d_avg": round(active_7, 1),
             "active_minutes_30d_avg": round(active_30, 1),
             "exercise_sessions_weekly": exercise_weekly,
+            "sedentary_hrs_day": _safe_float(profile.get("sedentary_hrs_day")),
         },
-        "data_sources": ["wearable_telemetry_1.csv", "lifestyle_survey.csv"],
+        "data_sources": ["curated.patient_metrics", "curated.patient_profile"],
     }
 
 
-def _build_nutrition(lifestyle_row: Dict[str, str], ehr_row: Dict[str, str]) -> Dict[str, Any]:
-    diet_quality = _safe_float(lifestyle_row.get("diet_quality_score"))
-    fruit_veg = _safe_float(lifestyle_row.get("fruit_veg_servings_daily"))
-    water = _safe_float(lifestyle_row.get("water_glasses_daily"))
-    alcohol = _safe_float(lifestyle_row.get("alcohol_units_weekly") or ehr_row.get("alcohol_units_weekly"))
+def _build_nutrition(profile: Dict[str, Any]) -> Dict[str, Any]:
+    diet_quality = _safe_float(profile.get("diet_quality_score"))
+    fruit_veg = _safe_float(profile.get("fruit_veg_servings_daily"))
+    water = _safe_float(profile.get("water_glasses_daily"))
+    alcohol = _safe_float(profile.get("current_alcohol_units_weekly"))
     alcohol_penalty = max(0.0, (alcohol - 10.0) * 3.5)
     score = max(0.0, min(100.0, (diet_quality / 10.0) * 45 + (fruit_veg / 5.0) * 30 + (water / 8.0) * 25 - alcohol_penalty))
     return {
@@ -204,16 +293,17 @@ def _build_nutrition(lifestyle_row: Dict[str, str], ehr_row: Dict[str, str]) -> 
             "fruit_veg_servings_daily": fruit_veg,
             "water_glasses_daily": water,
             "alcohol_units_weekly": alcohol,
+            "crp_mg_l": _safe_float(profile.get("crp_mg_l")),
         },
-        "data_sources": ["lifestyle_survey.csv", "ehr_records.csv"],
+        "data_sources": ["curated.patient_profile"],
     }
 
 
-def _build_mental(lifestyle_row: Dict[str, str]) -> Dict[str, Any]:
-    stress = _safe_float(lifestyle_row.get("stress_level"))
-    wellbeing = _safe_float(lifestyle_row.get("mental_wellbeing_who5"))
-    self_rated = _safe_float(lifestyle_row.get("self_rated_health"))
-    sleep_sat = _safe_float(lifestyle_row.get("sleep_satisfaction"))
+def _build_mental(profile: Dict[str, Any]) -> Dict[str, Any]:
+    stress = _safe_float(profile.get("stress_level"))
+    wellbeing = _safe_float(profile.get("mental_wellbeing_who5"))
+    self_rated = _safe_float(profile.get("self_rated_health"))
+    sleep_sat = _safe_float(profile.get("sleep_satisfaction"))
     stress_score = max(0.0, 100.0 - (stress * 10.0))
     wellbeing_score = min(100.0, (wellbeing / 25.0) * 100.0)
     self_rated_score = min(100.0, (self_rated / 5.0) * 100.0)
@@ -233,31 +323,36 @@ def _build_mental(lifestyle_row: Dict[str, str]) -> Dict[str, Any]:
             "self_rated_health": self_rated,
             "sleep_satisfaction": sleep_sat,
         },
-        "data_sources": ["lifestyle_survey.csv"],
+        "data_sources": ["curated.patient_profile"],
     }
 
 
-def analyze_patient_six_pillars(patient_id: str) -> Dict[str, Any]:
-    """Analyze all six pillars from raw datasets and Firestore context."""
-    ehr_row = _find_latest_row(_load_csv_rows(EHR_FILE), patient_id, "patient_id")
-    lifestyle_row = _find_latest_row(_load_csv_rows(LIFESTYLE_FILE), patient_id, "survey_date")
-    wearable_rows = _find_wearable_rows(patient_id)
+def analyze_patient_six_pillars(
+    patient_id: str,
+    firebase_context: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Analyze all six pillars from curated warehouse data and Firestore context."""
+    profile = _repository().get_patient_profile(patient_id)
 
-    if ehr_row is None or lifestyle_row is None or not wearable_rows:
+    if profile is None:
         return {
             "ok": False,
             "patient_id": patient_id,
-            "error": "Missing patient data in one or more raw CSV files.",
-            "required_files": [str(EHR_FILE), str(LIFESTYLE_FILE), str(WEARABLE_FILE)],
+            "error": "Missing patient data in curated warehouse tables.",
+            "required_sources": [
+                "curated.patient_profile",
+                "curated.patient_metrics",
+                "curated.coach_context",
+            ],
         }
 
     pillars = [
-        _build_sleep(ehr_row, wearable_rows),
-        _build_cardio(ehr_row, wearable_rows),
-        _build_metabolic(ehr_row),
-        _build_movement(lifestyle_row, wearable_rows),
-        _build_nutrition(lifestyle_row, ehr_row),
-        _build_mental(lifestyle_row),
+        _build_sleep(profile),
+        _build_cardio(profile),
+        _build_metabolic(profile),
+        _build_movement(profile),
+        _build_nutrition(profile),
+        _build_mental(profile),
     ]
     pillars.sort(key=lambda item: PILLARS.index(item["id"]))
 
@@ -266,14 +361,10 @@ def analyze_patient_six_pillars(patient_id: str) -> Dict[str, Any]:
     overall = "drifting" if drifting >= 3 or avg_score < 55 else ("on_track" if drifting == 0 and avg_score >= 70 else "mixed")
     primary_focus = sorted(pillars, key=lambda p: (p["score"], 0 if p["trend"] == "drifting" else 1))[0]
 
-    firebase_context = get_patient_firebase_context(patient_id)
-    firebase_summary = (
-        "No patient-specific Firestore documents found in checked collections."
-        if not firebase_context["collections_found"]
-        else f"Found data in: {', '.join(firebase_context['collections_found'])}."
-    )
+    firebase_context = firebase_context or get_patient_firebase_context(patient_id)
+    firebase_summary = _summarize_firebase_context(firebase_context)
 
-    return {
+    response = {
         "ok": True,
         "patient_id": patient_id,
         "generated_at": datetime.utcnow().isoformat() + "Z",
@@ -288,12 +379,15 @@ def analyze_patient_six_pillars(patient_id: str) -> Dict[str, Any]:
         "firebase_context_summary": firebase_summary,
         "firebase_context": firebase_context,
         "data_sources": [
-            "data/raw/ehr_records.csv",
-            "data/raw/lifestyle_survey.csv",
-            "data/raw/wearable_telemetry_1.csv",
+            "curated.patient_profile",
+            "curated.patient_metrics",
+            "curated.coach_context",
             "firestore",
         ],
     }
+    if firebase_context.get("diagnostics"):
+        response["firebase_debug"] = firebase_context["diagnostics"]
+    return response
 
 
 def explain_single_pillar(patient_id: str, pillar_id: str) -> Dict[str, Any]:
@@ -321,6 +415,8 @@ def explain_single_pillar(patient_id: str, pillar_id: str) -> Dict[str, Any]:
             f"and score {pillar['score']}. Key signals: {pillar['key_signals']}."
         ),
         "firebase_context_summary": analysis["firebase_context_summary"],
+        "firebase_context": analysis["firebase_context"],
+        "firebase_debug": analysis.get("firebase_debug"),
     }
 
 
@@ -342,6 +438,8 @@ def generate_tailored_explanation(patient_id: str) -> Dict[str, Any]:
     focus = sorted_by_risk[0]
     secondary = sorted_by_risk[1] if len(sorted_by_risk) > 1 else focus
     strongest = sorted(pillars, key=lambda p: p["score"], reverse=True)[0]
+    focus_prompt = _pick_focus_prompt(analysis["firebase_context"], focus["id"])
+    focus_opportunity = _pick_focus_opportunity(analysis["firebase_context"], focus["id"])
 
     claims = [
         {
@@ -373,6 +471,24 @@ def generate_tailored_explanation(patient_id: str) -> Dict[str, Any]:
             ],
         },
     ]
+    if focus_opportunity:
+        claims.append(
+            {
+                "claim": f"{focus_opportunity.get('title', 'A coaching opportunity')} is relevant right now.",
+                "why": focus_opportunity.get("why_now", "The Firestore strategy context highlights it for this patient."),
+                "evidence": [
+                    {
+                        "pillar_id": focus["id"],
+                        "score": focus["score"],
+                        "trend": focus["trend"],
+                        "state": focus["state"],
+                        "key_signals": focus["key_signals"],
+                        "firestore_context": focus_opportunity.get("evidence", {}),
+                        "data_sources": focus["data_sources"] + ["firestore"],
+                    }
+                ],
+            }
+        )
 
     trade_offs = [
         {
@@ -409,8 +525,39 @@ def generate_tailored_explanation(patient_id: str) -> Dict[str, Any]:
             },
         },
     ]
+    if focus_prompt:
+        next_best_actions.append(
+            {
+                "action": f"Ask the patient a low-friction follow-up: {focus_prompt.get('title', 'context check')}.",
+                "why": focus_prompt.get(
+                    "value",
+                    "Capturing context makes the next coaching step more specific and more actionable.",
+                ),
+                "evidence": {
+                    "focus_pillar": focus["id"],
+                    "prompt_example": focus_prompt.get("example_prompt"),
+                    "derived_from_pillars": focus_prompt.get("derived_from_pillars", []),
+                },
+            }
+        )
+    if focus_opportunity:
+        next_best_actions.append(
+            {
+                "action": f"Consider offering: {focus_opportunity.get('title', 'support option')}.",
+                "why": focus_opportunity.get(
+                    "coach_prompt",
+                    "The Firestore strategy context marks it as a relevant next step.",
+                ),
+                "evidence": {
+                    "focus_pillar": focus["id"],
+                    "opportunity_type": focus_opportunity.get("type"),
+                    "priority": focus_opportunity.get("priority"),
+                    "trigger_pillars": focus_opportunity.get("trigger_pillars", []),
+                },
+            }
+        )
 
-    return {
+    response = {
         "ok": True,
         "patient_id": patient_id,
         "context": {
@@ -418,6 +565,8 @@ def generate_tailored_explanation(patient_id: str) -> Dict[str, Any]:
             "average_score": analysis["average_score"],
             "firebase_context_summary": analysis["firebase_context_summary"],
         },
+        "firebase_context_summary": analysis["firebase_context_summary"],
+        "firebase_context": analysis["firebase_context"],
         "claims": claims,
         "trade_offs": trade_offs,
         "next_best_actions": next_best_actions,
@@ -444,3 +593,6 @@ def generate_tailored_explanation(patient_id: str) -> Dict[str, Any]:
             "must_avoid_diagnosis": True,
         },
     }
+    if analysis.get("firebase_debug"):
+        response["firebase_debug"] = analysis["firebase_debug"]
+    return response
