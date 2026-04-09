@@ -13,4 +13,9 @@ class AppConfig {
     'APP_ENABLE_FIREBASE',
     defaultValue: false,
   );
+
+  static const String firestoreDatabaseId = String.fromEnvironment(
+    'APP_FIRESTORE_DATABASE_ID',
+    defaultValue: '(default)',
+  );
 }

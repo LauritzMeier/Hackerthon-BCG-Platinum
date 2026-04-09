@@ -97,6 +97,12 @@ Set up Firebase for the Flutter app:
 ./scripts/setup_firebase.sh --project your-firebase-project-id
 ```
 
+Publish the generated patient data into Firestore:
+
+```bash
+./scripts/sync_firestore.sh --project your-firebase-project-id
+```
+
 That script will also remember the Firebase project in `.env.local` unless you pass `--no-save`.
 If `.env.local` contains `FIREBASE_PROJECT_ID`, the iOS and Android launch scripts will configure Firebase automatically on first launch when native config is still missing.
 
@@ -105,6 +111,7 @@ Run the app:
 ```bash
 ./scripts/run_ios.sh
 ./scripts/run_android.sh
+./scripts/run_web.sh
 ```
 
 Build and deploy the API prototype to Cloud Run with Cloud Build:
@@ -134,7 +141,7 @@ gcloud builds submit --config cloudbuild.yaml
 - Flutter, Firebase CLI, FlutterFire CLI, and Google Cloud CLI are installed locally. Restart your terminal if `flutterfire` is not immediately available on your PATH.
 - Android Studio, the Android SDK, platform tools, emulator tooling, and a default Android AVD are installed locally.
 - `adb` and `emulator` are available in a fresh terminal session.
-- Scripted entrypoints now live in `scripts/run_api.sh`, `scripts/setup_firebase.sh`, `scripts/run_android.sh`, and `scripts/run_ios.sh`.
+- Scripted entrypoints now live in `scripts/run_api.sh`, `scripts/setup_firebase.sh`, `scripts/sync_firestore.sh`, `scripts/run_android.sh`, `scripts/run_ios.sh`, and `scripts/run_web.sh`.
 - The run/setup scripts auto-load `.env.local` when it exists, so you do not need to keep retyping your Firebase project or local API defaults.
 - The documentation index lives in [docs/README.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/README.md).
 - The product brief lives in [docs/product/brief.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/product/brief.md).
