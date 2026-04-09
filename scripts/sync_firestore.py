@@ -24,6 +24,7 @@ except ImportError as exc:  # pragma: no cover - dependency guidance
 
 from longevity_mvp.bootstrap import ensure_local_warehouse
 from longevity_mvp.experience import build_experience
+from longevity_mvp.offer_catalog import list_offer_catalog
 from longevity_mvp.repository import WarehouseRepository
 
 
@@ -126,6 +127,16 @@ def build_patient_summary(experience: dict) -> dict:
     }
 
 
+def build_offer_catalog_documents() -> List[dict]:
+    synced_at = datetime.now(timezone.utc).isoformat()
+    documents = []
+    for entry in list_offer_catalog():
+        document = dict(entry)
+        document["synced_at"] = synced_at
+        documents.append(document)
+    return documents
+
+
 def main() -> int:
     args = parse_args()
     ensure_local_warehouse()
@@ -140,6 +151,17 @@ def main() -> int:
     if not patient_ids:
         print("No patients found to sync.", file=sys.stderr)
         return 1
+
+    catalog_documents = build_offer_catalog_documents()
+    if args.dry_run:
+        print(
+            f"[dry-run] Would sync {len(catalog_documents)} offer "
+            f"{'document' if len(catalog_documents) == 1 else 'documents'}"
+        )
+    else:
+        for document in catalog_documents:
+            db.collection("offer_catalog").document(document["offer_code"]).set(document)
+        print(f"Synced {len(catalog_documents)} offer catalog entries")
 
     total = 0
     for patient_id in patient_ids:

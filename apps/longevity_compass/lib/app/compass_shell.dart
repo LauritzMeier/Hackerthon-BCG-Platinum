@@ -23,18 +23,18 @@ class _CompassShellState extends State<CompassShell> {
 
   static const List<_ShellDestination> _destinations = [
     _ShellDestination(
-      label: 'Chat',
+      label: 'Coach',
       icon: Icons.chat_bubble_outline_rounded,
       screen: CoachScreen(),
     ),
     _ShellDestination(
-      label: 'Dashboard',
+      label: 'Today',
       icon: Icons.radar_rounded,
       screen: DashboardScreen(),
     ),
     _ShellDestination(
-      label: 'Future',
-      icon: Icons.timelapse_rounded,
+      label: 'Support',
+      icon: Icons.medical_services_outlined,
       screen: FutureScreen(),
     ),
   ];
@@ -267,13 +267,12 @@ class _ShellTopBar extends StatelessWidget {
     return Consumer<DashboardController>(
       builder: (context, controller, _) {
         final experience = controller.experience;
-        final status = _statusPresentation(controller);
         final patientMeta = experience == null
-            ? 'Waiting for live patient context'
-            : '${experience.profileSummary.age} • ${experience.profileSummary.country}';
+            ? 'Loading your profile'
+            : '${experience.profileSummary.patientId} • ${experience.profileSummary.age} • ${experience.profileSummary.country}';
         final summary = experience == null
-            ? 'Switching back to the three-page flow, now on real data.'
-            : experience.journeyStart.summary;
+            ? 'Bringing your care context into view.'
+            : 'Main goal this week: ${experience.weeklyPlan.primaryFocus.pillarName}.';
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
@@ -290,15 +289,13 @@ class _ShellTopBar extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Real patient flow',
+                        'Longevity Compass',
                         style: textTheme.titleMedium?.copyWith(
                           color: AppPalette.ink,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
-                    _StatusChip(status: status),
-                    const SizedBox(width: 8),
                     IconButton(
                       onPressed: controller.isLoading
                           ? null
@@ -360,7 +357,8 @@ class _PatientMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = selectedPatientId ?? 'Select patient';
+    final label =
+        selectedPatientId == null ? 'Select a profile' : 'Current profile';
 
     return PopupMenuButton<String>(
       onSelected: onSelected,
@@ -374,14 +372,14 @@ class _PatientMenu extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  patient.patientId,
+                  '${patient.age} • ${patient.country}',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${patient.age} • ${patient.country} • ${patient.primaryFocusArea}',
+                  '${patient.patientId} • ${patient.primaryFocusArea}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -533,73 +531,4 @@ class _NavButton extends StatelessWidget {
       ),
     );
   }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({
-    required this.status,
-  });
-
-  final _StatusPresentation status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: status.color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(status.icon, size: 16, color: status.color),
-          const SizedBox(width: 8),
-          Text(
-            status.label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: status.color,
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusPresentation {
-  const _StatusPresentation({
-    required this.label,
-    required this.icon,
-    required this.color,
-  });
-
-  final String label;
-  final IconData icon;
-  final Color color;
-}
-
-_StatusPresentation _statusPresentation(DashboardController controller) {
-  if (!controller.isFirebaseEnabled) {
-    return const _StatusPresentation(
-      label: 'API mode',
-      icon: Icons.cloud_outlined,
-      color: AppPalette.forest,
-    );
-  }
-
-  if (controller.firebaseUserId != null) {
-    return const _StatusPresentation(
-      label: 'Firebase sync on',
-      icon: Icons.sync_rounded,
-      color: AppPalette.forest,
-    );
-  }
-
-  return const _StatusPresentation(
-    label: 'Auth pending',
-    icon: Icons.cloud_off_outlined,
-    color: AppPalette.coral,
-  );
 }

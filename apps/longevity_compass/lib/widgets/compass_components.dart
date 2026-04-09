@@ -199,19 +199,14 @@ class CompassHeroCard extends StatelessWidget {
             children: [
               DirectionBadge(experience.compass.overallDirection),
               _HeroPill(
-                label: 'Primary focus',
-                value: experience.compass.primaryFocus.pillarName,
-              ),
-              _HeroPill(
-                label: 'Patient',
-                value:
-                    '${experience.profileSummary.country} • ${experience.profileSummary.age}',
+                label: 'This week',
+                value: experience.weeklyPlan.primaryFocus.pillarName,
               ),
             ],
           ),
           const SizedBox(height: 22),
           Text(
-            'Your compass says the next strongest longevity lever is ${experience.compass.primaryFocus.pillarName}.',
+            'This week, focus on ${experience.weeklyPlan.primaryFocus.pillarName}.',
             style: theme.textTheme.headlineSmall?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w700,
@@ -220,7 +215,7 @@ class CompassHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            experience.compass.primaryFocus.whyNow,
+            experience.weeklyPlan.primaryFocus.whyNow,
             style: theme.textTheme.bodyLarge?.copyWith(
               color: Colors.white.withValues(alpha: 0.82),
               height: 1.45,
@@ -243,7 +238,7 @@ class CompassHeroCard extends StatelessWidget {
                         .toStringAsFixed(1),
               ),
               _HeroMetric(
-                label: 'Gap',
+                label: 'Age gap',
                 value: ageText,
               ),
             ],
@@ -301,9 +296,11 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
       (pillar) => pillar.id == selectedComparison.pillarId,
       orElse: () => widget.experience.compass.pillars.first,
     );
-    final differenceAppearance = selectedComparison.difference >= 0
-        ? _appearanceForDirection('improving')
-        : _appearanceForDirection('drifting');
+    final differenceAppearance = selectedComparison.hasEnoughData
+        ? (selectedComparison.difference >= 0
+            ? _appearanceForDirection('improving')
+            : _appearanceForDirection('drifting'))
+        : _appearanceForDataConfidence(selectedComparison.scoreConfidence);
     final stateAppearance = _appearanceForState(selectedPillar.state);
     final trendAppearance = _appearanceForDirection(selectedPillar.trend);
 
@@ -390,7 +387,9 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
                         foreground: AppPalette.ink,
                       ),
                       _MiniBadge(
-                        label: differenceAppearance.label,
+                        label: selectedComparison.hasEnoughData
+                            ? differenceAppearance.label
+                            : 'Needs more data',
                         background: differenceAppearance.background,
                         foreground: differenceAppearance.foreground,
                       ),
@@ -424,12 +423,11 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
                     children: [
                       _ComparisonStatTile(
                         label: 'You',
-                        value:
-                            selectedComparison.patientScore.toStringAsFixed(0),
+                        value: selectedComparison.patientScoreLabel,
                       ),
                       _ComparisonStatTile(
                         label: 'Age cohort',
-                        value: selectedComparison.peerScore.toStringAsFixed(0),
+                        value: selectedComparison.peerScoreLabel,
                       ),
                     ],
                   ),
@@ -443,6 +441,12 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
                         background: stateAppearance.background,
                         foreground: stateAppearance.foreground,
                       ),
+                      if (!selectedPillar.hasEnoughData)
+                        _MiniBadge(
+                          label: 'Estimate only',
+                          background: AppPalette.sand.withValues(alpha: 0.95),
+                          foreground: AppPalette.ink,
+                        ),
                       _MiniBadge(
                         label: trendAppearance.label,
                         background: trendAppearance.background,
@@ -594,7 +598,8 @@ class _CompassRadarDiagram extends StatelessWidget {
                                     fit: BoxFit.scaleDown,
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           _shortPillarLabel(item.pillarName),
@@ -610,7 +615,7 @@ class _CompassRadarDiagram extends StatelessWidget {
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          item.patientScore.toStringAsFixed(0),
+                                          item.patientScoreLabel,
                                           style: Theme.of(context)
                                               .textTheme
                                               .titleMedium
@@ -884,7 +889,7 @@ class PillarCard extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            pillar.score.toStringAsFixed(0),
+            pillar.scoreLabel,
             style: theme.textTheme.displaySmall?.copyWith(
               color: AppPalette.ink,
               fontWeight: FontWeight.w700,
@@ -910,6 +915,12 @@ class PillarCard extends StatelessWidget {
                 background: stateAppearance.background,
                 foreground: stateAppearance.foreground,
               ),
+              if (!pillar.hasEnoughData)
+                _MiniBadge(
+                  label: 'Estimate only',
+                  background: AppPalette.sand.withValues(alpha: 0.95),
+                  foreground: AppPalette.ink,
+                ),
               _MiniBadge(
                 label: trendAppearance.label,
                 background: trendAppearance.background,
@@ -1133,26 +1144,6 @@ class OfferTile extends StatelessWidget {
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: secondary,
                     height: 1.4,
-                  ),
-                ),
-              ],
-              if (offer.missingData.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: highlight
-                        ? Colors.white.withValues(alpha: 0.12)
-                        : AppPalette.sand.withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Text(
-                    'To tailor this better: ${offer.missingData.first}',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: foreground,
-                      height: 1.35,
-                    ),
                   ),
                 ),
               ],
@@ -1499,6 +1490,10 @@ String _shortPillarLabel(String label) {
 }
 
 String _comparisonHeadline(PeerComparisonItem item) {
+  if (!item.hasEnoughData) {
+    return 'Not enough tracked data yet';
+  }
+
   final absoluteDifference = item.difference.abs();
   if (absoluteDifference < 2) {
     return 'Right in line with your age cohort';
@@ -1517,6 +1512,11 @@ String _comparisonBody(
   PeerComparisonSnapshot comparison,
   PrimaryFocus primaryFocus,
 ) {
+  if (!item.hasEnoughData) {
+    return 'This pillar is still being estimated from limited or stale data. '
+        'Track a little more here before treating the score as precise.';
+  }
+
   final notes = <String>[];
 
   if (item.pillarId == comparison.biggestGapPillarId) {
@@ -1538,6 +1538,25 @@ String _comparisonBody(
   }
 
   return notes.join(' ');
+}
+
+_BadgeAppearance _appearanceForDataConfidence(String raw) {
+  switch (raw) {
+    case 'medium':
+      return const _BadgeAppearance(
+        label: 'Estimate',
+        background: Color(0xFFF3E2C6),
+        foreground: AppPalette.amber,
+        icon: Icons.tune_rounded,
+      );
+    default:
+      return const _BadgeAppearance(
+        label: 'Needs more data',
+        background: Color(0xFFE7E1D8),
+        foreground: AppPalette.ink,
+        icon: Icons.question_mark_rounded,
+      );
+  }
 }
 
 Color _pillarAccent(String pillarId) {

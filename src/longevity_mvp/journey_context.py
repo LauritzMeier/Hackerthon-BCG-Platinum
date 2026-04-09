@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Dict, List, Optional
 
+from .offer_catalog import get_offer_catalog_entry
+
 
 CONDITION_LABELS = {
     "type2_diabetes": "type 2 diabetes",
@@ -140,6 +142,8 @@ def build_care_context(bundle: Dict, primary_focus: Dict) -> Dict:
 
 def build_data_coverage(bundle: Dict, primary_focus: Dict) -> Dict:
     profile = bundle["profile"]
+    has_meal_tracking = bool(profile.get("meals_logged_days"))
+    has_survey_context = bool(profile.get("latest_survey_date"))
 
     connected_sources: List[str] = []
     if profile.get("latest_wearable_date"):
@@ -150,27 +154,47 @@ def build_data_coverage(bundle: Dict, primary_focus: Dict) -> Dict:
         connected_sources.append(
             "Your medical record gives the coach diagnoses, medications, and earlier doctor visits for context."
         )
-    if profile.get("latest_survey_date"):
+    if has_survey_context:
         connected_sources.append(
-            "A lifestyle survey adds broad context on stress, hydration, and nutrition habits."
+            "One lifestyle survey adds broad self-reported context on stress, hydration, and nutrition habits."
+        )
+    if has_meal_tracking:
+        connected_sources.append(
+            "Meal logging is active, so nutrition recommendations can start reacting to real eating patterns."
         )
 
-    missing_sources = [
-        "Meals are not being logged yet, so nutrition advice is still broad rather than day-by-day personalized.",
-        "Symptoms and recovery check-ins are not being tracked yet, so the app cannot see how you feel after exercise or meals.",
-    ]
+    missing_sources: List[str] = []
+    if not has_meal_tracking:
+        missing_sources.append(
+            "A week of simple meal logging would make nutrition guidance much more specific."
+        )
+    missing_sources.append(
+        "A short symptom or recovery check-in would help the app understand how you feel after exercise or meals."
+    )
 
     focus_name = primary_focus.get("pillar_name", "your current focus area")
+    if primary_focus.get("pillar_id") in {"metabolic_health", "nutrition_quality"} and not has_meal_tracking:
+        headline = "We can already see the clinical risk picture, but nutrition is still only a broad estimate."
+        confidence_label = "Strong clinical context, lighter nutrition detail"
+        tailoring_note = (
+            "The app can already use medical history and recovery trends well. "
+            "Nutrition becomes meaningfully more personal after a small amount of meal logging."
+        )
+    else:
+        headline = f"We can already tailor {focus_name.lower()} well from the data that is connected."
+        confidence_label = "Good recovery signal coverage"
+        tailoring_note = (
+            "The coach can already personalize movement, recovery, and trend explanations. "
+            "Nutrition can get sharper later with a little meal logging."
+        )
+
     return {
-        "headline": f"We can already tailor {focus_name.lower()} better than nutrition.",
-        "confidence_label": "Good recovery signal coverage, limited nutrition detail",
+        "headline": headline,
+        "confidence_label": confidence_label,
         "connected_sources": connected_sources,
         "missing_sources": missing_sources,
-        "tailoring_note": (
-            "The coach can already personalize movement, recovery, and trend explanations. "
-            "Nutrition recommendations stay general until meal logging starts."
-        ),
-        "needs_meal_tracking": True,
+        "tailoring_note": tailoring_note,
+        "needs_meal_tracking": not has_meal_tracking,
     }
 
 
@@ -199,8 +223,7 @@ def build_journey_start(
         what_we_know.append(f"The clearest risk signal right now is {top_flag.lower()}.")
 
     what_we_need = [
-        "Meals are not being tracked yet, so the app cannot tell whether your current eating pattern is helping or hurting.",
-        "If you want more tailored nutrition guidance, start by logging one meal a day for the next 7 days.",
+        "One week of simple meal tracking would make nutrition guidance much more specific.",
     ]
 
     medications = split_pipe_values(profile.get("medications"))
@@ -227,186 +250,82 @@ def build_journey_start(
     }
 
 
+def _format_offer_template(
+    value,
+    primary_focus: Dict,
+    care_context: Dict,
+    data_coverage: Dict,
+):
+    if isinstance(value, str):
+        return value.format(
+            focus_name=primary_focus.get("pillar_name", "your current focus area"),
+            focus_name_lower=primary_focus.get("pillar_name", "your current focus area").lower(),
+            medical_guardrail=care_context.get("medical_guardrail", ""),
+            tailoring_note=data_coverage.get("tailoring_note", ""),
+        )
+
+    if isinstance(value, list):
+        return [
+            _format_offer_template(item, primary_focus, care_context, data_coverage)
+            for item in value
+        ]
+
+    return value
+
+
 def _offer_blueprint(
     offer_code: str,
     primary_focus: Dict,
     care_context: Dict,
     data_coverage: Dict,
 ) -> Dict:
-    focus_name = primary_focus.get("pillar_name", "your current focus area")
-
-    blueprints = {
-        "preventive_cardiometabolic_panel": {
-            "label": "Cardiometabolic recovery review",
-            "category": "Clinical review",
-            "summary": "Bring your current risk picture, medications, and recovery trends into one practical follow-up plan.",
-            "why_now": (
-                "This makes sense when cardiovascular or metabolic risk is active and the user needs clarity, "
-                "not another generic wellness package."
-            ),
-            "includes": [
-                "Review of current cardiovascular and metabolic risk markers",
-                "Medication and follow-up question prep for the next clinician visit",
-                "A clear decision on what to monitor first at home versus in clinic",
-            ],
-            "expected_outcome": "The user understands what needs clinician follow-up now and what can improve through behavior support.",
-            "time_commitment": "One focused review plus a short follow-up.",
-            "data_used": [
-                "medical record history",
-                "current medications",
-                "watch-based recovery and movement trends",
-            ],
-            "missing_data": [
-                "meal logs for more specific nutrition guidance",
-            ],
-            "first_week": [
-                "Bring recent questions and concerns into one note",
-                "Keep wearing the watch so recovery trends stay visible",
-                "Log one meal a day so the next nutrition recommendation gets sharper",
-            ],
-            "caution": care_context["medical_guardrail"],
-            "personalization_note": "Best when the user needs medically grounded prioritization, not a broad lifestyle package.",
-        },
-        "movement_program": {
-            "label": "Guided recovery movement plan",
-            "category": "Habit support",
-            "summary": "Restart activity with a realistic floor, safe progression, and watch-based feedback.",
-            "why_now": f"This is most useful when {focus_name.lower()} is lagging and confidence is lower than motivation.",
-            "includes": [
-                "A simple weekly movement target based on current watch data",
-                "Progression that starts with consistency before intensity",
-                "Light check-ins that connect movement back to recovery",
-            ],
-            "expected_outcome": "The user moves more consistently without feeling like they were dropped into a hard training plan.",
-            "time_commitment": "Short daily movement blocks plus one weekly review.",
-            "data_used": [
-                "steps",
-                "active minutes",
-                "resting heart rate and recovery trends",
-            ],
-            "missing_data": [
-                "symptom check-ins after exercise",
-            ],
-            "first_week": [
-                "Set a floor you can keep every day",
-                "Notice how energy and recovery respond",
-                "Ask the coach to adjust the plan if recovery feels off",
-            ],
-            "caution": care_context["medical_guardrail"],
-            "personalization_note": "Good when the user needs structure and reassurance more than intensity.",
-        },
-        "nutrition_coaching": {
-            "label": "Nutrition reset with meal tracking",
-            "category": "Behavior coaching",
-            "summary": "Start with simple meal tracking so nutrition support becomes personal instead of generic.",
-            "why_now": (
-                "Nutrition clearly matters, but the app should admit that advice stays broad until actual meals are logged."
-            ),
-            "includes": [
-                "A one-meal-a-day tracking habit to get real signal",
-                "Pattern review around fiber, protein, hydration, and alcohol",
-                "Small changes that fit the current recovery or risk-reduction goal",
-            ],
-            "expected_outcome": "The user gets a more trustworthy nutrition plan because the app finally sees real eating patterns.",
-            "time_commitment": "A few minutes per day for logging and one short weekly review.",
-            "data_used": [
-                "survey-level nutrition habits",
-                "metabolic risk markers",
-                "watch-based energy and activity context",
-            ],
-            "missing_data": [
-                "meal-by-meal logs",
-            ],
-            "first_week": [
-                "Log one meal a day for seven days",
-                "Notice one repeated nutrition drag",
-                "Use the coach to decide what to change first",
-            ],
-            "caution": "This is best for personalization and habit support, not for replacing clinician advice after an acute event.",
-            "personalization_note": "Useful, but it becomes much stronger after one week of meal tracking.",
-        },
-        "sleep_recovery_package": {
-            "label": "Sleep and recovery reset",
-            "category": "Recovery support",
-            "summary": "Use recovery habits and sleep structure to improve resilience before everything else feels harder.",
-            "why_now": f"This fits when {focus_name.lower()} is limited by poor sleep, stress, or low recovery capacity.",
-            "includes": [
-                "Simple sleep window and wind-down adjustments",
-                "Recovery review using watch data",
-                "A plan that links sleep improvements back to energy and consistency",
-            ],
-            "expected_outcome": "The user feels steadier and better able to follow the rest of the plan.",
-            "time_commitment": "Short nightly routine changes and one weekly review.",
-            "data_used": [
-                "sleep duration",
-                "sleep quality",
-                "resting heart rate and HRV",
-            ],
-            "missing_data": [
-                "daytime symptom and caffeine timing data",
-            ],
-            "first_week": [
-                "Protect one consistent bedtime window",
-                "Reduce one friction point before bed",
-                "Ask the coach what improved or worsened recovery this week",
-            ],
-            "caution": "Use this as support, not as a substitute for clinician follow-up if symptoms or recovery worsen.",
-            "personalization_note": "Good when sleep is the bottleneck behind everything else.",
-        },
-        "follow_up_prep": {
-            "label": "Next appointment prep",
-            "category": "Follow-up support",
-            "summary": "Turn your doctor history and current signals into better questions for the next visit.",
-            "why_now": "New users often need help understanding what their last appointment means before they can commit to a plan.",
-            "includes": [
-                "A short summary of the last relevant doctor context on file",
-                "Questions to bring to the next visit",
-                "A checklist of what to monitor before the appointment",
-            ],
-            "expected_outcome": "The user arrives at the next appointment feeling prepared instead of overwhelmed.",
-            "time_commitment": "One preparation session before the next visit.",
-            "data_used": [
-                "doctor visit history",
-                "medication list",
-                "current compass priorities",
-            ],
-            "missing_data": [],
-            "first_week": [
-                "Save questions while they come up",
-                "Keep the coach updated on changes or concerns",
-                "Track one habit the clinician is likely to ask about",
-            ],
-            "caution": care_context["medical_guardrail"],
-            "personalization_note": "Especially useful early in the journey, before the user trusts the rest of the plan.",
-        },
-        "meal_tracking_reset": {
-            "label": "7-day meal tracking starter",
-            "category": "Data setup",
-            "summary": "Give the app enough real food data to tailor nutrition instead of guessing.",
-            "why_now": data_coverage["tailoring_note"],
-            "includes": [
-                "One simple meal log per day",
-                "A review of repeated patterns after one week",
-                "A clearer handoff into nutrition support if it is still needed",
-            ],
-            "expected_outcome": "Nutrition recommendations stop feeling generic because the app finally sees real eating behavior.",
-            "time_commitment": "Two to three minutes per day.",
-            "data_used": [
-                "survey habits",
-                "metabolic signals",
-            ],
-            "missing_data": [],
-            "first_week": [
-                "Log the first meal that feels easiest to remember",
-                "Do not try to be perfect; just be consistent",
-                "Ask the coach what pattern it sees at the end of the week",
-            ],
-            "caution": "This is a setup step for better personalization, not a clinical treatment.",
-            "personalization_note": "Low effort, high value for a new user.",
-        },
+    blueprint = get_offer_catalog_entry(offer_code)
+    return {
+        "label": _format_offer_template(
+            blueprint["offer_label"], primary_focus, care_context, data_coverage
+        ),
+        "category": _format_offer_template(
+            blueprint["category"], primary_focus, care_context, data_coverage
+        ),
+        "offer_type": _format_offer_template(
+            blueprint.get("offer_type", ""), primary_focus, care_context, data_coverage
+        ),
+        "delivery_model": _format_offer_template(
+            blueprint.get("delivery_model", ""), primary_focus, care_context, data_coverage
+        ),
+        "summary": _format_offer_template(
+            blueprint["summary"], primary_focus, care_context, data_coverage
+        ),
+        "why_now": _format_offer_template(
+            blueprint["why_now_template"], primary_focus, care_context, data_coverage
+        ),
+        "includes": _format_offer_template(
+            blueprint["includes"], primary_focus, care_context, data_coverage
+        ),
+        "expected_outcome": _format_offer_template(
+            blueprint["expected_outcome"], primary_focus, care_context, data_coverage
+        ),
+        "time_commitment": _format_offer_template(
+            blueprint["time_commitment"], primary_focus, care_context, data_coverage
+        ),
+        "data_used": _format_offer_template(
+            blueprint["data_used"], primary_focus, care_context, data_coverage
+        ),
+        "missing_data": _format_offer_template(
+            blueprint["missing_data"], primary_focus, care_context, data_coverage
+        ),
+        "first_week": _format_offer_template(
+            blueprint["first_week"], primary_focus, care_context, data_coverage
+        ),
+        "caution": _format_offer_template(
+            blueprint["caution_template"], primary_focus, care_context, data_coverage
+        ),
+        "personalization_note": _format_offer_template(
+            blueprint["personalization_note"], primary_focus, care_context, data_coverage
+        ),
+        "active": bool(blueprint.get("active", True)),
+        "sort_order": blueprint.get("sort_order", 999),
     }
-
-    return blueprints[offer_code]
 
 
 def enrich_offer(
@@ -421,6 +340,8 @@ def enrich_offer(
         {
             "offer_label": blueprint["label"],
             "category": blueprint["category"],
+            "offer_type": blueprint["offer_type"],
+            "delivery_model": blueprint["delivery_model"],
             "summary": blueprint["summary"],
             "why_now": blueprint["why_now"],
             "includes": blueprint["includes"],
@@ -431,6 +352,8 @@ def enrich_offer(
             "first_week": blueprint["first_week"],
             "caution": blueprint["caution"],
             "personalization_note": blueprint["personalization_note"],
+            "active": blueprint["active"],
+            "sort_order": blueprint["sort_order"],
         }
     )
     return enriched
@@ -491,7 +414,16 @@ def build_offer_summary(
         if offer_code in seen_codes:
             continue
         seen_codes.add(offer_code)
-        deduped_additional.append(offer)
+        if offer.get("active", True):
+            deduped_additional.append(offer)
+
+    deduped_additional.sort(
+        key=lambda offer: (
+            offer.get("priority", 99),
+            offer.get("sort_order", 999),
+            offer.get("offer_label", ""),
+        )
+    )
 
     return {
         "recommended": (

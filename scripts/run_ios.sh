@@ -22,7 +22,7 @@ Usage: ./scripts/run_ios.sh [options] [-- flutter_run_args...]
 
 Defaults:
   - Launches the Apple iOS Simulator.
-  - Runs the Flutter app with localhost API access.
+  - Uses Firestore-first mode when Firebase is enabled.
   - Enables Firebase automatically if the app is already configured.
 
 Options:
@@ -135,7 +135,7 @@ if [[ -z "$TARGET_DEVICE_ID" ]]; then
   fi
 fi
 
-if [[ "$DRY_RUN" != "true" ]]; then
+if [[ "$DRY_RUN" != "true" && "$ENABLE_FIREBASE" != "true" ]]; then
   ensure_local_api_warning "$API_BASE_URL"
 fi
 
