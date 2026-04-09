@@ -74,6 +74,15 @@ The MVP should prove these points:
 - monetization is relevant and timely rather than intrusive
 - the architecture looks viable for a real enterprise rollout
 
+## Working Commercial Model
+
+The current working assumption is a hybrid model:
+
+- recurring value comes from weekly coaching and retention
+- episodic revenue comes from diagnostics, packages, or targeted support
+
+This keeps the app useful even when the user is not in an active conversion moment.
+
 ## Business Goals
 
 The app should support three business outcomes:
@@ -92,7 +101,7 @@ Current scope:
 - Flutter as the primary client stack across mobile and, if useful, web
 - Firebase as the app platform layer for the MVP
 - Google-first target deployment architecture
-- chatbot included only if it clearly improves understanding, retention, or conversion
+- chatbot included as a core explanation and goal-definition surface
 
 Out of scope for the first MVP:
 
@@ -125,6 +134,18 @@ This concept is a better anchor than a generic dashboard because it combines:
 - recurring utility
 - monetization logic
 
+## Current Build Slice
+
+The first implementation slice should stay tight and map directly to the challenge:
+
+1. A main Longevity Compass page that shows the six pillars and current status
+2. One overall direction and one primary focus area derived from the compass
+3. A chatbot page in the left navigation that explains the compass and helps define goals
+4. A goals page in the right navigation that shows only user-accepted goals
+5. One clear flow where goals are proposed in chat, accepted by the user, and then added to the goals page
+
+The companion web surface should use the same core model, even if mobile remains the primary engagement surface.
+
 ## Compass Operating Model
 
 The compass should become the primary product model for the app.
@@ -133,6 +154,8 @@ Everything else should derive from it:
 
 - weekly coaching
 - chatbot explanations
+- goal suggestions
+- accepted goals
 - nudges
 - risk flags
 - diagnostics recommendations
@@ -157,13 +180,31 @@ The compass should always answer two questions at the pillar level:
 From there, the app can derive:
 
 - one primary focus area
-- one weekly plan
 - one recommended conversation with the coach
+- one proposed set of goals
+- one accepted goal list
 - one relevant offer when extra support is justified
+
+## Working North Star Metric
+
+Working MVP north star metric:
+
+- weekly guided engagement rate
+
+Definition:
+
+- the share of activated users who view their compass and complete at least one meaningful action in a rolling 7-day window
+
+Meaningful actions include:
+
+- accepting a goal
+- sending a coach message
+- acknowledging an alert
+- tapping through to a relevant offer
 
 ## Questions Still Open
 
 - Which primary persona should anchor the live demo?
 - Which monetization path should lead the story: diagnostics, subscription, or hybrid?
 - What should the north star metric be for year one?
-- How directive should the chatbot be versus how explanatory?
+- How directive should the chatbot be when proposing goals versus explaining them?

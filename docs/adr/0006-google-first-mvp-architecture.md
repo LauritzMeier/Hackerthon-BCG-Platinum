@@ -25,7 +25,7 @@ Use a Google-first target architecture for the MVP:
 
 - Flutter as the primary client stack
 - Firebase as the core app platform layer
-- Firebase App Hosting or Firebase Hosting for the web app
+- Firebase Hosting for the Flutter web app
 - Firebase Authentication for sign-in
 - Cloud Firestore for app state
 - Firebase Cloud Messaging for re-engagement

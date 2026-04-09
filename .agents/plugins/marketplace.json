@@ -1,0 +1,20 @@
+{
+  "name": "hackerthon-bcg-platinum",
+  "interface": {
+    "displayName": "Hackerthon BCG Platinum Plugins"
+  },
+  "plugins": [
+    {
+      "name": "playwright-browser-testing",
+      "source": {
+        "source": "local",
+        "path": "./plugins/playwright-browser-testing"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

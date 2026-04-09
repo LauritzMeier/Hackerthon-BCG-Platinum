@@ -12,6 +12,7 @@ They are written before detailed feature implementation so the product does not 
 - Every journey should have a retention reason, not just an onboarding reason.
 - Every journey should have an optional but relevant monetization moment.
 - The chatbot should act as a helpful guide across journeys, not as a novelty layer.
+- The goals page should contain only goals the user has explicitly accepted.
 - Personalization should adapt tone, cadence, and recommendations by persona and risk context.
 - The Longevity Compass should be the common thread across journeys.
 - Every meaningful user-facing output should be traceable back to one or more compass pillars.
@@ -24,6 +25,16 @@ The MVP should operate as four connected journeys:
 2. Weekly compass check-in and coaching loop
 3. Risk drift to action journey
 4. Relevant offer conversion and follow-through
+
+## Current MVP User Stories
+
+These stories define the first build slice:
+
+1. As a user, I want to see my six-pillar compass and overall direction so I can understand where I am now and where I am heading.
+2. As a user, I want the chatbot to help me define realistic goals linked to my weakest or fastest-drifting pillar so I know what to do next.
+3. As a user, I want accepted goals to appear in a dedicated goals page so I can track what I committed to.
+4. As a user, I want to ask the coach why my direction changed and adapt proposed goals to my schedule, stress, or motivation.
+5. As a user, I want one relevant support option only when my compass shows that extra help is justified.
 
 ## Journey 1: Compass Onboarding And First Value
 
@@ -41,20 +52,21 @@ Show the user that fragmented data can become one clear and personal starting po
 
 1. User signs in with low-friction authentication.
 2. App explains what data it uses and how the compass works.
-3. User chooses goals and coaching preferences.
+3. User lands on the main compass page and reviews the six pillars and current status.
 4. App assembles the initial Longevity Compass:
    - six pillar states
    - six pillar trajectories
    - primary focus area
-   - first 7-day action plan
-5. User can ask the coach why they are seeing each recommendation.
+   - first set of recommended goals
+5. User opens the chatbot, asks follow-up questions, and refines proposed goals.
+6. User accepts selected goals and sees them appear in the goals page.
 
 ### Chatbot Role
 
 - explain the current compass state
 - explain which pillars are strongest and weakest
 - explain why one focus area matters most
-- convert the baseline into a conversational first-week plan
+- convert the baseline into a conversational first set of goals
 
 ### Monetization Role
 
@@ -63,7 +75,7 @@ Usually none at first unless there is a very strong, signal-driven reason.
 ### Success Signal
 
 - onboarding completion
-- first plan acceptance
+- first goal acceptance
 - first coach interaction
 
 ## Journey 2: Weekly Compass Check-In And Coaching Loop
@@ -85,14 +97,14 @@ Create a strong weekly reason to return and reinforce that the app is actively t
    - stable
    - drifting
 2. User sees which pillar is driving the change.
-3. User receives 2-3 realistic actions for the coming week.
-4. Chatbot adapts the plan to schedule, stress, travel, budget, or motivation.
+3. Chatbot proposes 1-3 realistic goals for the coming week or adjusts existing goals.
+4. User accepts the updated goals and sees the goals page refresh.
 5. App tracks adherence and visible progress.
 
 ### Chatbot Role
 
 - explain the weekly change
-- tailor the plan to real-life constraints
+- tailor proposed goals to real-life constraints
 - keep the product feeling personal between major reviews
 
 ### Monetization Role
@@ -106,7 +118,7 @@ Soft and supportive:
 ### Success Signal
 
 - weekly active users
-- action plan completion rate
+- goal acceptance or update rate
 - chatbot conversations per active user
 
 ## Journey 3: Risk Drift To Action Journey
@@ -125,8 +137,8 @@ Turn a negative change in trajectory or a risk signal into understandable action
 
 1. App shows that the compass is drifting in a specific pillar.
 2. User sees what changed and why it matters.
-3. App proposes a short action plan.
-4. Chatbot answers questions and reduces anxiety.
+3. Chatbot proposes revised goals or a next-best action.
+4. User accepts the revised goals or asks for more explanation.
 5. If relevant, app recommends a diagnostics package or program.
 
 ### Chatbot Role
@@ -147,7 +159,7 @@ This is the cleanest high-intent conversion path because the recommendation is t
 ### Success Signal
 
 - flag acknowledgment
-- action plan acceptance
+- goal acceptance
 - diagnostics or package conversion
 
 ## Journey 4: Offer Conversion And Follow-Through
@@ -171,8 +183,8 @@ Make monetization feel like relevant support and then feed the result back into 
    - reminders
    - completion tracking
    - result integration
-   - updated next-best actions
-5. User returns to the weekly compass loop with new context.
+   - updated goals
+5. User returns to the compass, chatbot, and goals loop with new context.
 
 ### Chatbot Role
 
@@ -214,6 +226,19 @@ Primary revenue capture:
 - Choose Markus if we want the cleanest diagnostics-led monetization story
 - Choose Sofia if we want the clearest retention-led story
 
+## Build Implication
+
+The current implementation should balance both:
+
+- a coaching-led weekly loop to create regular usage
+- a compass-driven next-best offer to create monetization without breaking trust
+
+The current top-level navigation should stay simple:
+
+- main compass page
+- chatbot page
+- goals page
+
 ## Compass Rule
 
 The product should follow one simple rule:
@@ -223,7 +248,7 @@ The product should follow one simple rule:
 That includes:
 
 - chatbot prompts
-- weekly plans
+- goals
 - nudges
 - risk alerts
 - diagnostics recommendations
