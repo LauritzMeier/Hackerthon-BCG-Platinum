@@ -76,15 +76,20 @@ If credentials are valid, a test document is created in Firestore collection
 uvicorn agent.server:app --host 0.0.0.0 --port 8080
 ```
 
-### Endpoints
+### Endpoints (single central chat)
 
-- `POST /explain` returns a full response payload (batch)
-- `POST /explain/stream` streams SSE deltas for real-time feedback
+- `POST /chat` returns a full response payload (batch)
+- `POST /chat/stream` streams SSE deltas for real-time feedback
+
+The UI should use only one chat surface. The backend routes internally:
+
+- general chat questions -> coach response
+- pillar-related questions -> automatic pillar analysis/explanation with evidence
 
 Example stream call:
 
 ```bash
-curl -N -X POST http://127.0.0.1:8080/explain/stream \
+curl -N -X POST http://127.0.0.1:8080/chat/stream \
   -H "Content-Type: application/json" \
-  -d '{"patient_id":"PT0001"}'
+  -d '{"patient_id":"PT0001","message":"How is my sleep pillar doing?"}'
 ```
