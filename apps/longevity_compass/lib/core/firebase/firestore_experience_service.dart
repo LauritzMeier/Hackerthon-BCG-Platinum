@@ -6,6 +6,8 @@ import '../config/app_config.dart';
 import '../models/experience_models.dart';
 
 class FirestoreExperienceService {
+  static const Set<String> _hiddenPatientIds = {'PTWELCOME'};
+
   FirestoreExperienceService({FirebaseFirestore? firestore})
       : _firestore = AppConfig.enableFirebase
             ? (firestore ??
@@ -37,6 +39,7 @@ class FirestoreExperienceService {
             data.putIfAbsent('patient_id', () => doc.id);
             return PatientListItem.fromJson(data);
           })
+          .where((patient) => !_hiddenPatientIds.contains(patient.patientId))
           .toList(growable: false);
     }
 
@@ -54,17 +57,24 @@ class FirestoreExperienceService {
     }
 
     return experiences.docs
-        .map((doc) => _patientListItemFromExperience(doc.id, _normalizeMap(doc.data())))
+        .map(
+          (doc) =>
+              _patientListItemFromExperience(doc.id, _normalizeMap(doc.data())),
+        )
+        .where((patient) => !_hiddenPatientIds.contains(patient.patientId))
         .toList(growable: false);
   }
 
   Future<ExperienceSnapshot> fetchExperience(String patientId) async {
     if (!isEnabled) {
-      throw StateError('Firestore experience access is disabled for this build.');
+      throw StateError(
+          'Firestore experience access is disabled for this build.');
     }
 
-    final document =
-        await _firestore!.collection('patient_experiences').doc(patientId).get();
+    final document = await _firestore!
+        .collection('patient_experiences')
+        .doc(patientId)
+        .get();
     if (!document.exists) {
       throw StateError(
         'No Firestore experience found at `patient_experiences/$patientId`.',

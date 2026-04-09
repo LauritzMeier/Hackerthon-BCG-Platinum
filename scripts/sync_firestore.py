@@ -23,6 +23,13 @@ except ImportError as exc:  # pragma: no cover - dependency guidance
     ) from exc
 
 from longevity_mvp.bootstrap import ensure_local_warehouse
+from longevity_mvp.customer_journeys import (
+    WELCOME_PATIENT_ID,
+    build_customer_profile,
+    build_welcome_customer_profile,
+    build_welcome_experience,
+    build_welcome_patient_summary,
+)
 from longevity_mvp.experience import build_experience
 from longevity_mvp.offer_catalog import list_offer_catalog
 from longevity_mvp.repository import WarehouseRepository
@@ -137,6 +144,12 @@ def build_offer_catalog_documents() -> List[dict]:
     return documents
 
 
+def build_customer_profile_document(bundle: dict) -> dict:
+    document = build_customer_profile(bundle)
+    document["synced_at"] = datetime.now(timezone.utc).isoformat()
+    return document
+
+
 def main() -> int:
     args = parse_args()
     ensure_local_warehouse()
@@ -172,6 +185,7 @@ def main() -> int:
 
         experience = build_experience(bundle)
         summary = build_patient_summary(experience)
+        customer_profile = build_customer_profile_document(bundle)
 
         if args.dry_run:
             print(f"[dry-run] Would sync {patient_id}")
@@ -180,8 +194,28 @@ def main() -> int:
 
         db.collection("patient_experiences").document(patient_id).set(experience)
         db.collection("patient_summaries").document(patient_id).set(summary)
+        db.collection("customer_profiles").document(patient_id).set(customer_profile)
         total += 1
         print(f"Synced {patient_id}")
+
+    welcome_experience = build_welcome_experience()
+    welcome_summary = build_welcome_patient_summary()
+    welcome_profile = build_welcome_customer_profile()
+    welcome_profile["synced_at"] = datetime.now(timezone.utc).isoformat()
+
+    if args.dry_run:
+        print(f"[dry-run] Would sync onboarding demo {WELCOME_PATIENT_ID}")
+    else:
+        db.collection("patient_experiences").document(WELCOME_PATIENT_ID).set(
+            welcome_experience
+        )
+        db.collection("patient_summaries").document(WELCOME_PATIENT_ID).set(
+            welcome_summary
+        )
+        db.collection("customer_profiles").document(WELCOME_PATIENT_ID).set(
+            welcome_profile
+        )
+        print(f"Synced onboarding demo {WELCOME_PATIENT_ID}")
 
     print(
         f"{'Prepared' if args.dry_run else 'Synced'} {total} patient "

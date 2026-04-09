@@ -15,8 +15,9 @@ class PatientListItem {
       sex: _asString(json['sex']),
       country: _asString(json['country']),
       primaryFocusArea: _asString(json['primary_focus_area']),
-      estimatedBiologicalAge:
-          _asNullableDouble(json['estimated_biological_age']),
+      estimatedBiologicalAge: _asNullableDouble(
+        json['estimated_biological_age'],
+      ),
     );
   }
 
@@ -57,8 +58,9 @@ class ExperienceSnapshot {
       journeyStart: JourneyStart.fromJson(_asMap(json['journey_start'])),
       careContext: CareContext.fromJson(_asMap(json['care_context'])),
       dataCoverage: DataCoverage.fromJson(_asMap(json['data_coverage'])),
-      progressSummary:
-          ProgressSummary.fromJson(_asMap(json['progress_summary'])),
+      progressSummary: ProgressSummary.fromJson(
+        _asMap(json['progress_summary']),
+      ),
       alerts: AlertSummary.fromJson(_asMap(json['alerts'])),
       offers: OfferSummary.fromJson(_asMap(json['offers'])),
     );
@@ -181,8 +183,9 @@ class ProfileSummary {
       age: _asInt(json['age']),
       sex: _asString(json['sex']),
       country: _asString(json['country']),
-      estimatedBiologicalAge:
-          _asNullableDouble(json['estimated_biological_age']),
+      estimatedBiologicalAge: _asNullableDouble(
+        json['estimated_biological_age'],
+      ),
       ageGapYears: _asNullableDouble(json['age_gap_years']),
     );
   }
@@ -210,8 +213,9 @@ class CompassSnapshot {
     return CompassSnapshot(
       overallDirection: _asString(json['overall_direction']),
       chronologicalAge: _asInt(json['chronological_age']),
-      estimatedBiologicalAge:
-          _asNullableDouble(json['estimated_biological_age']),
+      estimatedBiologicalAge: _asNullableDouble(
+        json['estimated_biological_age'],
+      ),
       primaryFocus: PrimaryFocus.fromJson(_asMap(json['primary_focus'])),
       pillars: _asObjectList(json['pillars'], PillarSnapshot.fromJson),
       peerComparison: PeerComparisonSnapshot.fromJson(
@@ -245,8 +249,9 @@ class PeerComparisonSnapshot {
       headline: _asString(json['headline']),
       cohortLabel: _asString(json['cohort_label']),
       sampleSize: _asInt(json['sample_size']),
-      strongestRelativePillarId:
-          _asString(json['strongest_relative_pillar_id']),
+      strongestRelativePillarId: _asString(
+        json['strongest_relative_pillar_id'],
+      ),
       biggestGapPillarId: _asString(json['biggest_gap_pillar_id']),
       items: _asObjectList(json['items'], PeerComparisonItem.fromJson),
     );
@@ -396,10 +401,7 @@ class WeeklyPlan {
 }
 
 class PlanAction {
-  PlanAction({
-    required this.title,
-    required this.description,
-  });
+  PlanAction({required this.title, required this.description});
 
   factory PlanAction.fromJson(Map<String, dynamic> json) {
     return PlanAction(
@@ -443,8 +445,10 @@ class ProgressSummary {
     return ProgressSummary(
       latestReadingDate: _asDateTime(json['latest_reading_date']),
       latestSnapshot: LatestSnapshot.fromJson(_asMap(json['latest_snapshot'])),
-      headlineTrends:
-          _asObjectList(json['headline_trends'], HeadlineTrend.fromJson),
+      headlineTrends: _asObjectList(
+        json['headline_trends'],
+        HeadlineTrend.fromJson,
+      ),
     );
   }
 
@@ -558,10 +562,7 @@ class RiskFlag {
 }
 
 class OfferSummary {
-  OfferSummary({
-    required this.recommended,
-    required this.additionalItems,
-  });
+  OfferSummary({required this.recommended, required this.additionalItems});
 
   factory OfferSummary.fromJson(Map<String, dynamic> json) {
     final recommendedRaw = json['recommended'];
@@ -569,8 +570,10 @@ class OfferSummary {
       recommended: recommendedRaw is Map<String, dynamic>
           ? OfferOpportunity.fromJson(recommendedRaw)
           : null,
-      additionalItems:
-          _asObjectList(json['additional_items'], OfferOpportunity.fromJson),
+      additionalItems: _asObjectList(
+        json['additional_items'],
+        OfferOpportunity.fromJson,
+      ),
     );
   }
 
@@ -585,6 +588,8 @@ class OfferOpportunity {
     required this.rationale,
     required this.priority,
     required this.category,
+    required this.offerType,
+    required this.deliveryModel,
     required this.summary,
     required this.whyNow,
     required this.includes,
@@ -595,6 +600,7 @@ class OfferOpportunity {
     required this.firstWeek,
     required this.caution,
     required this.personalizationNote,
+    required this.ctaLabel,
   });
 
   factory OfferOpportunity.fromJson(Map<String, dynamic> json) {
@@ -604,6 +610,8 @@ class OfferOpportunity {
       rationale: _asString(json['rationale']),
       priority: _asInt(json['priority']),
       category: _asString(json['category']),
+      offerType: _asString(json['offer_type']),
+      deliveryModel: _asString(json['delivery_model']),
       summary: _asString(json['summary']),
       whyNow: _asString(json['why_now']),
       includes: _asStringList(json['includes']),
@@ -614,6 +622,7 @@ class OfferOpportunity {
       firstWeek: _asStringList(json['first_week']),
       caution: _asString(json['caution']),
       personalizationNote: _asString(json['personalization_note']),
+      ctaLabel: _asString(json['cta_label']),
     );
   }
 
@@ -622,6 +631,8 @@ class OfferOpportunity {
   final String rationale;
   final int priority;
   final String category;
+  final String offerType;
+  final String deliveryModel;
   final String summary;
   final String whyNow;
   final List<String> includes;
@@ -632,13 +643,212 @@ class OfferOpportunity {
   final List<String> firstWeek;
   final String caution;
   final String personalizationNote;
+  final String ctaLabel;
+
+  String get primaryActionLabel {
+    if (ctaLabel.isNotEmpty) {
+      return ctaLabel;
+    }
+
+    switch (offerType) {
+      case 'appointment':
+      case 'appointment_prep':
+        return 'Book visit';
+      case 'diagnostic':
+        return 'Book test';
+      case 'program':
+      case 'coaching':
+        return 'Start plan';
+      case 'supplement':
+        return 'Book review';
+      case 'starter':
+        return 'Start now';
+      default:
+        return 'See next step';
+    }
+  }
+}
+
+class CustomerProfile {
+  CustomerProfile({
+    required this.patientId,
+    required this.displayName,
+    required this.journeyStage,
+    required this.journeyTitle,
+    required this.journeySummary,
+    required this.possibilities,
+    required this.dataSources,
+    required this.updatedAt,
+  });
+
+  factory CustomerProfile.fromJson(Map<String, dynamic> json) {
+    return CustomerProfile(
+      patientId: _asString(json['patient_id']),
+      displayName: _asString(json['display_name']),
+      journeyStage: _asString(json['journey_stage']),
+      journeyTitle: _asString(json['journey_title']),
+      journeySummary: _asString(json['journey_summary']),
+      possibilities: _asStringList(json['possibilities']),
+      dataSources: _asObjectList(
+        json['data_sources'],
+        DataSourceConnection.fromJson,
+      ),
+      updatedAt: _asDateTime(json['updated_at']),
+    );
+  }
+
+  final String patientId;
+  final String displayName;
+  final String journeyStage;
+  final String journeyTitle;
+  final String journeySummary;
+  final List<String> possibilities;
+  final List<DataSourceConnection> dataSources;
+  final DateTime? updatedAt;
+
+  bool get isWelcomeJourney => journeyStage == 'welcome';
+
+  int get connectedSourceCount =>
+      dataSources.where((source) => source.connected).length;
+
+  List<DataSourceConnection> get connectedSources =>
+      dataSources.where((source) => source.connected).toList(growable: false);
+
+  List<DataSourceConnection> get disconnectedSources =>
+      dataSources.where((source) => !source.connected).toList(growable: false);
+
+  CustomerProfile copyWith({
+    String? patientId,
+    String? displayName,
+    String? journeyStage,
+    String? journeyTitle,
+    String? journeySummary,
+    List<String>? possibilities,
+    List<DataSourceConnection>? dataSources,
+    DateTime? updatedAt,
+  }) {
+    return CustomerProfile(
+      patientId: patientId ?? this.patientId,
+      displayName: displayName ?? this.displayName,
+      journeyStage: journeyStage ?? this.journeyStage,
+      journeyTitle: journeyTitle ?? this.journeyTitle,
+      journeySummary: journeySummary ?? this.journeySummary,
+      possibilities: possibilities ?? this.possibilities,
+      dataSources: dataSources ?? this.dataSources,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}
+
+class DataSourceConnection {
+  DataSourceConnection({
+    required this.sourceId,
+    required this.label,
+    required this.category,
+    required this.connected,
+    required this.provider,
+    required this.statusText,
+    required this.ctaLabel,
+  });
+
+  factory DataSourceConnection.fromJson(Map<String, dynamic> json) {
+    return DataSourceConnection(
+      sourceId: _asString(json['source_id']),
+      label: _asString(json['label']),
+      category: _asString(json['category']),
+      connected: _asBool(json['connected']),
+      provider: _asString(json['provider']),
+      statusText: _asString(json['status_text']),
+      ctaLabel: _asString(json['cta_label']),
+    );
+  }
+
+  final String sourceId;
+  final String label;
+  final String category;
+  final bool connected;
+  final String provider;
+  final String statusText;
+  final String ctaLabel;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'source_id': sourceId,
+      'label': label,
+      'category': category,
+      'connected': connected,
+      'provider': provider,
+      'status_text': statusText,
+      'cta_label': ctaLabel,
+    };
+  }
+
+  DataSourceConnection copyWith({
+    String? sourceId,
+    String? label,
+    String? category,
+    bool? connected,
+    String? provider,
+    String? statusText,
+    String? ctaLabel,
+  }) {
+    return DataSourceConnection(
+      sourceId: sourceId ?? this.sourceId,
+      label: label ?? this.label,
+      category: category ?? this.category,
+      connected: connected ?? this.connected,
+      provider: provider ?? this.provider,
+      statusText: statusText ?? this.statusText,
+      ctaLabel: ctaLabel ?? this.ctaLabel,
+    );
+  }
+}
+
+class SupportBooking {
+  SupportBooking({
+    required this.bookingId,
+    required this.patientId,
+    required this.offerCode,
+    required this.offerLabel,
+    required this.offerType,
+    required this.deliveryModel,
+    required this.status,
+    required this.scheduledFor,
+    required this.scheduledLabel,
+    required this.createdAt,
+  });
+
+  factory SupportBooking.fromJson(Map<String, dynamic> json) {
+    return SupportBooking(
+      bookingId: _asString(json['booking_id']),
+      patientId: _asString(json['patient_id']),
+      offerCode: _asString(json['offer_code']),
+      offerLabel: _asString(json['offer_label']),
+      offerType: _asString(json['offer_type']),
+      deliveryModel: _asString(json['delivery_model']),
+      status: _asString(json['status']),
+      scheduledFor: _asDateTime(json['scheduled_for']),
+      scheduledLabel: _asString(json['scheduled_label']),
+      createdAt: _asDateTime(json['created_at']),
+    );
+  }
+
+  final String bookingId;
+  final String patientId;
+  final String offerCode;
+  final String offerLabel;
+  final String offerType;
+  final String deliveryModel;
+  final String status;
+  final DateTime? scheduledFor;
+  final String scheduledLabel;
+  final DateTime? createdAt;
+
+  bool get isBooked => status == 'booked';
 }
 
 class CoachReply {
-  CoachReply({
-    required this.reply,
-    required this.primaryFocus,
-  });
+  CoachReply({required this.reply, required this.primaryFocus});
 
   factory CoachReply.fromJson(Map<String, dynamic> json) {
     return CoachReply(
@@ -652,10 +862,7 @@ class CoachReply {
 }
 
 class ChatMessage {
-  ChatMessage({
-    required this.role,
-    required this.text,
-  });
+  ChatMessage({required this.role, required this.text});
 
   factory ChatMessage.assistant(String text) {
     return ChatMessage(role: 'assistant', text: text);

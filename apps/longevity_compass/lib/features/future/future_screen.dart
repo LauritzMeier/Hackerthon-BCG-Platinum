@@ -30,54 +30,101 @@ class FutureScreen extends StatelessWidget {
           );
         }
 
-        final recommendedOffer = experience.offers.recommended;
-        final otherOffers = experience.offers.additionalItems
-            .where((offer) => offer.offerCode != recommendedOffer?.offerCode)
-            .take(2)
+        final bookedOffers = controller.supportBookings
+            .where((booking) => booking.isBooked)
             .toList(growable: false);
+        final bookedCodes =
+            bookedOffers.map((booking) => booking.offerCode).toSet();
+        final allOffers = <OfferOpportunity>[
+          if (experience.offers.recommended != null)
+            experience.offers.recommended!,
+          ...experience.offers.additionalItems.where(
+            (offer) =>
+                offer.offerCode != experience.offers.recommended?.offerCode,
+          ),
+        ];
+        final availableOffers = allOffers
+            .where((offer) => !bookedCodes.contains(offer.offerCode))
+            .toList(growable: false);
+        final recommendedOffer =
+            availableOffers.isNotEmpty ? availableOffers.first : null;
+        final otherOffers = availableOffers.skip(1).take(3).toList(
+              growable: false,
+            );
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(18, 20, 18, 120),
           children: [
-            const ScreenHeader(
+            ScreenHeader(
               eyebrow: 'Support',
-              title: 'Only the help that makes sense right now.',
-              subtitle:
-                  'Keep this short. Start with one clinic-relevant next step, then open a card if you want the drill-down.',
+              title: controller.isWelcomeJourney
+                  ? 'Choose the first real step that gets you moving.'
+                  : 'Choose the next support that actually helps.',
+              subtitle: controller.isWelcomeJourney
+                  ? 'For a new customer, the most useful support is one clear visit, screening, or baseline step.'
+                  : 'These options are filtered to the services that still fit your medical plan and current recovery stage.',
             ),
-            const SizedBox(height: 24),
-            SectionSurface(
-              title: 'Before you choose support',
-              subtitle:
-                  'Support should reinforce the current medical plan, not distract from it.',
-              child: _SupportGuardrailCard(
-                careContext: experience.careContext,
-                dataCoverage: experience.dataCoverage,
+            if (bookedOffers.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              SectionSurface(
+                title: 'Booked next steps',
+                subtitle:
+                    'This is what is already on the calendar, so you can see progress instead of guessing.',
+                child: Column(
+                  children: [
+                    for (var index = 0;
+                        index < bookedOffers.length;
+                        index++) ...[
+                      _BookedSupportCard(booking: bookedOffers[index]),
+                      if (index < bookedOffers.length - 1)
+                        const SizedBox(height: 12),
+                    ],
+                  ],
+                ),
               ),
-            ),
+            ],
             if (recommendedOffer != null) ...[
               const SizedBox(height: 24),
               SectionSurface(
                 title: 'Best next step',
-                subtitle: recommendedOffer.whyNow,
+                subtitle: controller.isWelcomeJourney
+                    ? 'Start with one clinician-led step or diagnostic that makes the blank slate more concrete.'
+                    : 'Start with one clinic action that fits the current plan and recovery stage.',
                 child: OfferTile(
                   offer: recommendedOffer,
                   highlight: true,
+                  onBook: (offer, scheduledFor, scheduledLabel) async {
+                    return controller.bookSupportOffer(
+                      offer: offer,
+                      scheduledFor: scheduledFor,
+                      scheduledLabel: scheduledLabel,
+                    );
+                  },
                 ),
               ),
             ],
             if (otherOffers.isNotEmpty) ...[
               const SizedBox(height: 24),
               SectionSurface(
-                title: 'Other ways we can help',
-                subtitle:
-                    'Only keep the options that support the current plan or make the app more useful.',
+                title: 'Also available now',
+                subtitle: controller.isWelcomeJourney
+                    ? 'These are good second steps once you have one real starting point in place.'
+                    : 'These still make sense right now, but they do not need to be first.',
                 child: Column(
                   children: [
                     for (var index = 0;
                         index < otherOffers.length;
                         index++) ...[
-                      OfferTile(offer: otherOffers[index]),
+                      OfferTile(
+                        offer: otherOffers[index],
+                        onBook: (offer, scheduledFor, scheduledLabel) async {
+                          return controller.bookSupportOffer(
+                            offer: offer,
+                            scheduledFor: scheduledFor,
+                            scheduledLabel: scheduledLabel,
+                          );
+                        },
+                      ),
                       if (index < otherOffers.length - 1)
                         const SizedBox(height: 12),
                     ],
@@ -92,74 +139,10 @@ class FutureScreen extends StatelessWidget {
   }
 }
 
-class _SupportGuardrailCard extends StatelessWidget {
-  const _SupportGuardrailCard({
-    required this.careContext,
-    required this.dataCoverage,
-  });
+class _BookedSupportCard extends StatelessWidget {
+  const _BookedSupportCard({required this.booking});
 
-  final CareContext careContext;
-  final DataCoverage dataCoverage;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final stacked = constraints.maxWidth < 860;
-        final children = [
-          _SupportInsightCard(
-            title: 'What is driving the recommendation',
-            body: careContext.lastAppointmentSummary,
-            footer: careContext.medicalGuardrail,
-            accent: AppPalette.sand.withValues(alpha: 0.82),
-          ),
-          _SupportInsightCard(
-            title: 'What would make this more precise',
-            body: dataCoverage.tailoringNote,
-            footer: dataCoverage.missingSources.isEmpty
-                ? null
-                : dataCoverage.missingSources.first,
-            accent: AppPalette.mint.withValues(alpha: 0.34),
-          ),
-        ];
-
-        if (stacked) {
-          return Column(
-            children: [
-              for (var index = 0; index < children.length; index++) ...[
-                children[index],
-                if (index < children.length - 1) const SizedBox(height: 12),
-              ],
-            ],
-          );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var index = 0; index < children.length; index++) ...[
-              Expanded(child: children[index]),
-              if (index < children.length - 1) const SizedBox(width: 12),
-            ],
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _SupportInsightCard extends StatelessWidget {
-  const _SupportInsightCard({
-    required this.title,
-    required this.body,
-    required this.accent,
-    this.footer,
-  });
-
-  final String title;
-  final String body;
-  final String? footer;
-  final Color accent;
+  final SupportBooking booking;
 
   @override
   Widget build(BuildContext context) {
@@ -167,35 +150,48 @@ class _SupportInsightCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: accent,
+        color: AppPalette.mint.withValues(alpha: 0.26),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppPalette.ink,
-                ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.86),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              'Booked',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: AppPalette.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
           ),
           const SizedBox(height: 12),
           Text(
-            body,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppPalette.ink.withValues(alpha: 0.78),
-                  height: 1.45,
+            booking.offerLabel,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppPalette.ink,
+                  fontWeight: FontWeight.w700,
                 ),
           ),
-          if (footer != null && footer!.isNotEmpty) ...[
-            const SizedBox(height: 16),
+          const SizedBox(height: 6),
+          Text(
+            booking.scheduledLabel,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppPalette.ink.withValues(alpha: 0.74),
+                ),
+          ),
+          if (booking.deliveryModel.isNotEmpty) ...[
+            const SizedBox(height: 6),
             Text(
-              footer!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppPalette.ink,
+              booking.deliveryModel,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppPalette.ink.withValues(alpha: 0.64),
                     fontWeight: FontWeight.w700,
-                    height: 1.4,
                   ),
             ),
           ],

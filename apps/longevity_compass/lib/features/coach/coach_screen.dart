@@ -50,74 +50,109 @@ class _CoachScreenState extends State<CoachScreen> {
         return ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            ScreenHeader(
-              eyebrow: experience.coach.coachName,
-              title:
-                  'Ask about your recovery, your last visit, or your next step.',
-              subtitle:
-                  'You should not need to start from zero. I already have your last doctor context and your connected watch data.',
-            ),
-            const SizedBox(height: 24),
-            SectionSurface(
-              title: 'What I already know',
-              subtitle: 'This is the context I use before I answer anything.',
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final stacked = constraints.maxWidth < 900;
-                  final cards = [
-                    _CoachContextCard(
-                      title: 'From your last appointment',
-                      body: experience.careContext.lastAppointmentSummary,
-                      accent: AppPalette.sand.withValues(alpha: 0.82),
-                      itemsTitle: 'Priorities now',
-                      items: experience.careContext.clinicalPriorities
-                          .take(3)
-                          .toList(growable: false),
-                      footer: experience.careContext.medicalGuardrail,
+            if (controller.isWelcomeJourney) ...[
+              ScreenHeader(
+                eyebrow: experience.coach.coachName,
+                title: 'Start with the outcome you want, not with busywork.',
+                subtitle:
+                    'I can help you choose the first data source, explain what each clinic option is for, and keep the setup simple.',
+              ),
+              const SizedBox(height: 24),
+              SectionSurface(
+                title: 'How I can help right now',
+                subtitle:
+                    'This is the guidance that matters before the app has much data.',
+                child: Column(
+                  children: [
+                    _CoachInfoList(
+                      title: 'What the first week should feel like',
+                      items: experience.journeyStart.startHere,
                     ),
-                    _CoachContextCard(
-                      title: 'To personalize more',
-                      body: experience.dataCoverage.tailoringNote,
-                      accent: AppPalette.mint.withValues(alpha: 0.34),
-                      itemsTitle: 'Still missing',
-                      items: experience.dataCoverage.missingSources
-                          .take(3)
-                          .toList(growable: false),
-                      footer: experience.dataCoverage.needsMealTracking
-                          ? 'The fastest improvement is to log one meal a day for 7 days.'
-                          : null,
-                    ),
-                  ];
+                    if ((controller.customerProfile?.possibilities.isNotEmpty ??
+                        false)) ...[
+                      const SizedBox(height: 16),
+                      _CoachInfoList(
+                        title: 'What becomes possible next',
+                        items: controller.customerProfile!.possibilities,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ] else ...[
+              ScreenHeader(
+                eyebrow: experience.coach.coachName,
+                title:
+                    'Ask about your recovery, your last visit, or your next step.',
+                subtitle:
+                    'You should not need to start from zero. I already have your last doctor context and your connected watch data.',
+              ),
+              const SizedBox(height: 24),
+              SectionSurface(
+                title: 'What I already know',
+                subtitle: 'This is the context I use before I answer anything.',
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stacked = constraints.maxWidth < 900;
+                    final cards = [
+                      _CoachContextCard(
+                        title: 'From your last appointment',
+                        body: experience.careContext.lastAppointmentSummary,
+                        accent: AppPalette.sand.withValues(alpha: 0.82),
+                        itemsTitle: 'Priorities now',
+                        items: experience.careContext.clinicalPriorities
+                            .take(3)
+                            .toList(growable: false),
+                        footer: experience.careContext.medicalGuardrail,
+                      ),
+                      _CoachContextCard(
+                        title: 'To personalize more',
+                        body: experience.dataCoverage.tailoringNote,
+                        accent: AppPalette.mint.withValues(alpha: 0.34),
+                        itemsTitle: 'Still missing',
+                        items: experience.dataCoverage.missingSources
+                            .take(3)
+                            .toList(growable: false),
+                        footer: experience.dataCoverage.needsMealTracking
+                            ? 'The fastest improvement is to log one meal a day for 7 days.'
+                            : null,
+                      ),
+                    ];
 
-                  if (stacked) {
-                    return Column(
+                    if (stacked) {
+                      return Column(
+                        children: [
+                          for (var index = 0;
+                              index < cards.length;
+                              index++) ...[
+                            cards[index],
+                            if (index < cards.length - 1)
+                              const SizedBox(height: 12),
+                          ],
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         for (var index = 0; index < cards.length; index++) ...[
-                          cards[index],
+                          Expanded(child: cards[index]),
                           if (index < cards.length - 1)
-                            const SizedBox(height: 12),
+                            const SizedBox(width: 12),
                         ],
                       ],
                     );
-                  }
-
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var index = 0; index < cards.length; index++) ...[
-                        Expanded(child: cards[index]),
-                        if (index < cards.length - 1) const SizedBox(width: 12),
-                      ],
-                    ],
-                  );
-                },
+                  },
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: 24),
             SectionSurface(
               title: 'Good first questions',
-              subtitle:
-                  'Start here if you want the coach to explain the plan in plain language.',
+              subtitle: controller.isWelcomeJourney
+                  ? 'Start here if you want to set up the journey without overcomplicating it.'
+                  : 'Start here if you want the coach to explain the plan in plain language.',
               child: Wrap(
                 spacing: 10,
                 runSpacing: 10,
@@ -134,8 +169,9 @@ class _CoachScreenState extends State<CoachScreen> {
             const SizedBox(height: 24),
             SectionSurface(
               title: 'Chat',
-              subtitle:
-                  'Use this to clarify the plan, explain what changed, or ask what support makes sense next.',
+              subtitle: controller.isWelcomeJourney
+                  ? 'Use this to talk through what to connect first, what to book first, or what outcome you want from the app.'
+                  : 'Use this to clarify the plan, explain what changed, or ask what support makes sense next.',
               child: Column(
                 children: [
                   for (final message in controller.chatMessages) ...[
@@ -162,9 +198,10 @@ class _CoachScreenState extends State<CoachScreen> {
                     controller: _textController,
                     minLines: 1,
                     maxLines: 4,
-                    decoration: const InputDecoration(
-                      hintText:
-                          'Tell the coach what happened, what your doctor said, or what feels unclear.',
+                    decoration: InputDecoration(
+                      hintText: controller.isWelcomeJourney
+                          ? 'Tell the coach what you want help with, what you can connect, or what feels most important first.'
+                          : 'Tell the coach what happened, what your doctor said, or what feels unclear.',
                     ),
                     onSubmitted: (value) => _send(controller, value),
                   ),

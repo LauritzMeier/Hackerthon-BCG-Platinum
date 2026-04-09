@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/_app_env.sh"
 
 DEVICE_ID="${WEB_DEVICE_ID:-chrome}"
-API_BASE_URL="${APP_API_BASE_URL:-http://127.0.0.1:8000}"
+API_BASE_URL="${APP_API_BASE_URL:-}"
 AGENT_BASE_URL="${APP_AGENT_BASE_URL:-}"
 ENABLE_FIREBASE="${APP_ENABLE_FIREBASE:-auto}"
 FIREBASE_PROJECT_ID_FLAG="${FIREBASE_PROJECT_ID:-}"
@@ -111,6 +111,10 @@ if [[ "$ENABLE_FIREBASE" == "true" ]] && ! firebase_is_configured; then
   die "Firebase is enabled but the app is not configured yet. Run ./scripts/setup_firebase.sh --project <firebase-project-id> first."
 fi
 
+if [[ "$ENABLE_FIREBASE" != "true" ]]; then
+  API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:8000}"
+fi
+
 if [[ "$DRY_RUN" != "true" && "$ENABLE_FIREBASE" != "true" ]]; then
   ensure_local_api_warning "$API_BASE_URL"
 fi
@@ -119,8 +123,11 @@ CMD=(
   flutter
   run
   -d "$DEVICE_ID"
-  --dart-define=APP_API_BASE_URL="$API_BASE_URL"
 )
+
+if [[ -n "$API_BASE_URL" ]]; then
+  CMD+=(--dart-define=APP_API_BASE_URL="$API_BASE_URL")
+fi
 
 if [[ -n "$AGENT_BASE_URL" ]]; then
   CMD+=(--dart-define=APP_AGENT_BASE_URL="$AGENT_BASE_URL")
@@ -139,7 +146,7 @@ if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
 fi
 
 log "Target web device: ${DEVICE_ID}"
-log "API base URL: ${API_BASE_URL}"
+log "API base URL: ${API_BASE_URL:-"(not set)"}"
 log "Agent base URL: ${AGENT_BASE_URL:-"(not set)"}"
 log "Firebase enabled: ${ENABLE_FIREBASE}"
 log "Firestore database: ${FIRESTORE_DATABASE_ID:-"(default)"}"

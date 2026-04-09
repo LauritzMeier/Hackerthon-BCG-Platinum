@@ -90,9 +90,7 @@ class SectionSurface extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.78),
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: AppPalette.ink.withValues(alpha: 0.05),
-        ),
+        border: Border.all(color: AppPalette.ink.withValues(alpha: 0.05)),
         boxShadow: [
           BoxShadow(
             color: AppPalette.ink.withValues(alpha: 0.04),
@@ -162,10 +160,7 @@ class DirectionBadge extends StatelessWidget {
 }
 
 class CompassHeroCard extends StatelessWidget {
-  const CompassHeroCard({
-    super.key,
-    required this.experience,
-  });
+  const CompassHeroCard({super.key, required this.experience});
 
   final ExperienceSnapshot experience;
 
@@ -237,10 +232,7 @@ class CompassHeroCard extends StatelessWidget {
                     : experience.compass.estimatedBiologicalAge!
                         .toStringAsFixed(1),
               ),
-              _HeroMetric(
-                label: 'Age gap',
-                value: ageText,
-              ),
+              _HeroMetric(label: 'Age gap', value: ageText),
             ],
           ),
         ],
@@ -250,10 +242,7 @@ class CompassHeroCard extends StatelessWidget {
 }
 
 class CompassRadarCard extends StatefulWidget {
-  const CompassRadarCard({
-    super.key,
-    required this.experience,
-  });
+  const CompassRadarCard({super.key, required this.experience});
 
   final ExperienceSnapshot experience;
 
@@ -316,9 +305,7 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(34),
-        border: Border.all(
-          color: AppPalette.ink.withValues(alpha: 0.06),
-        ),
+        border: Border.all(color: AppPalette.ink.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -476,11 +463,7 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
               if (stacked) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    chart,
-                    const SizedBox(height: 24),
-                    detail,
-                  ],
+                  children: [chart, const SizedBox(height: 24), detail],
                 );
               }
 
@@ -515,10 +498,8 @@ class _CompassRadarDiagram extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final canvasSize = math.min(constraints.maxWidth, 430.0).clamp(
-              280.0,
-              430.0,
-            );
+        final canvasSize =
+            math.min(constraints.maxWidth, 430.0).clamp(280.0, 430.0);
         final center = canvasSize / 2;
         final radius = canvasSize * 0.28;
         const chipWidth = 112.0;
@@ -576,8 +557,9 @@ class _CompassRadarDiagram extends StatelessWidget {
                                   border: Border.all(
                                     color: selected
                                         ? accent
-                                        : AppPalette.ink
-                                            .withValues(alpha: 0.08),
+                                        : AppPalette.ink.withValues(
+                                            alpha: 0.08,
+                                          ),
                                   ),
                                   boxShadow: [
                                     BoxShadow(
@@ -645,10 +627,7 @@ class _CompassRadarDiagram extends StatelessWidget {
 }
 
 class _CompassRadarPainter extends CustomPainter {
-  _CompassRadarPainter({
-    required this.items,
-    required this.selectedPillarId,
-  });
+  _CompassRadarPainter({required this.items, required this.selectedPillarId});
 
   final List<PeerComparisonItem> items;
   final String selectedPillarId;
@@ -813,10 +792,7 @@ class _CompassRadarPainter extends CustomPainter {
 }
 
 class _ComparisonStatTile extends StatelessWidget {
-  const _ComparisonStatTile({
-    required this.label,
-    required this.value,
-  });
+  const _ComparisonStatTile({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -855,10 +831,7 @@ class _ComparisonStatTile extends StatelessWidget {
 }
 
 class PillarCard extends StatelessWidget {
-  const PillarCard({
-    super.key,
-    required this.pillar,
-  });
+  const PillarCard({super.key, required this.pillar});
 
   final PillarSnapshot pillar;
 
@@ -873,9 +846,7 @@ class PillarCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: AppPalette.ink.withValues(alpha: 0.05),
-        ),
+        border: Border.all(color: AppPalette.ink.withValues(alpha: 0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -935,10 +906,7 @@ class PillarCard extends StatelessWidget {
 }
 
 class MetricTrendTile extends StatelessWidget {
-  const MetricTrendTile({
-    super.key,
-    required this.trend,
-  });
+  const MetricTrendTile({super.key, required this.trend});
 
   final HeadlineTrend trend;
 
@@ -987,11 +955,7 @@ class MetricTrendTile extends StatelessWidget {
 }
 
 class ActionTile extends StatelessWidget {
-  const ActionTile({
-    super.key,
-    required this.index,
-    required this.action,
-  });
+  const ActionTile({super.key, required this.index, required this.action});
 
   final int index;
   final PlanAction action;
@@ -1054,14 +1018,69 @@ class ActionTile extends StatelessWidget {
   }
 }
 
+Future<void> _showOfferDetailSheet(
+  BuildContext context,
+  OfferOpportunity offer, {
+  required bool highlight,
+  required Future<SupportBooking?> Function(
+    OfferOpportunity offer,
+    DateTime scheduledFor,
+    String scheduledLabel,
+  ) onBook,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => _OfferDetailSheet(
+      offer: offer,
+      highlight: highlight,
+      hostContext: context,
+      onBook: onBook,
+    ),
+  );
+}
+
+Future<SupportBooking?> _noopBookOffer(
+  OfferOpportunity offer,
+  DateTime scheduledFor,
+  String scheduledLabel,
+) async {
+  return null;
+}
+
+Future<void> _showOfferActionSheet(
+  BuildContext context,
+  OfferOpportunity offer,
+  Future<SupportBooking?> Function(
+    OfferOpportunity offer,
+    DateTime scheduledFor,
+    String scheduledLabel,
+  ) onBook,
+) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) =>
+        _OfferActionSheet(offer: offer, hostContext: context, onBook: onBook),
+  );
+}
+
 class OfferTile extends StatelessWidget {
   const OfferTile({
     super.key,
     required this.offer,
+    this.onBook = _noopBookOffer,
     this.highlight = false,
   });
 
   final OfferOpportunity offer;
+  final Future<SupportBooking?> Function(
+    OfferOpportunity offer,
+    DateTime scheduledFor,
+    String scheduledLabel,
+  ) onBook;
   final bool highlight;
 
   @override
@@ -1071,94 +1090,168 @@ class OfferTile extends StatelessWidget {
     final secondary = highlight
         ? Colors.white.withValues(alpha: 0.84)
         : AppPalette.ink.withValues(alpha: 0.72);
+    final previewItems = offer.includes.take(2).toList(growable: false);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: highlight
+            ? const LinearGradient(
+                colors: [AppPalette.forest, AppPalette.moss],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: highlight ? null : Colors.white.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(28),
-        onTap: () => showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (context) => _OfferDetailSheet(
-            offer: offer,
-            highlight: highlight,
-          ),
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: highlight
-                ? const LinearGradient(
-                    colors: [AppPalette.forest, AppPalette.moss],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-            color: highlight ? null : Colors.white.withValues(alpha: 0.82),
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  _MiniBadge(
-                    label: highlight ? 'Best next step' : offer.category,
-                    background: highlight
-                        ? Colors.white.withValues(alpha: 0.14)
-                        : AppPalette.mint.withValues(alpha: 0.7),
-                    foreground: highlight ? Colors.white : AppPalette.ink,
+              _MiniBadge(
+                label: highlight ? 'Best next step' : offer.category,
+                background: highlight
+                    ? Colors.white.withValues(alpha: 0.14)
+                    : AppPalette.mint.withValues(alpha: 0.7),
+                foreground: highlight ? Colors.white : AppPalette.ink,
+              ),
+              if (offer.deliveryModel.isNotEmpty)
+                _MiniBadge(
+                  label: offer.deliveryModel,
+                  background: highlight
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : AppPalette.sand.withValues(alpha: 0.9),
+                  foreground: highlight ? Colors.white : AppPalette.ink,
+                ),
+              if (offer.timeCommitment.isNotEmpty)
+                _MiniBadge(
+                  label: offer.timeCommitment,
+                  background: highlight
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : Colors.white,
+                  foreground: highlight ? Colors.white : AppPalette.ink,
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            offer.offerLabel,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            offer.summary.isNotEmpty ? offer.summary : offer.rationale,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: secondary,
+              height: 1.42,
+            ),
+          ),
+          if (offer.whyNow.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              offer.whyNow,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: secondary,
+                height: 1.4,
+              ),
+            ),
+          ],
+          if (previewItems.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'What you get',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: foreground,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final item in previewItems) ...[
+              _OfferPreviewPoint(
+                text: item,
+                foreground: secondary,
+                highlight: highlight,
+              ),
+              if (item != previewItems.last) const SizedBox(height: 8),
+            ],
+          ],
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: () =>
+                      _showOfferActionSheet(context, offer, onBook),
+                  style: FilledButton.styleFrom(
+                    backgroundColor:
+                        highlight ? Colors.white : AppPalette.forest,
+                    foregroundColor: highlight ? AppPalette.ink : Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  if (!highlight && offer.personalizationNote.isNotEmpty)
-                    _MiniBadge(
-                      label: 'Why it fits',
-                      background: AppPalette.sand.withValues(alpha: 0.9),
-                      foreground: AppPalette.ink,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                offer.offerLabel,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: foreground,
-                  fontWeight: FontWeight.w700,
+                  child: Text(offer.primaryActionLabel),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                offer.summary.isNotEmpty ? offer.summary : offer.rationale,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: secondary,
-                  height: 1.42,
+              const SizedBox(width: 10),
+              TextButton(
+                onPressed: () => _showOfferDetailSheet(
+                  context,
+                  offer,
+                  highlight: highlight,
+                  onBook: onBook,
                 ),
-              ),
-              if (offer.whyNow.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  'Why now: ${offer.whyNow}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: secondary,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 14),
-              Text(
-                'Tap for details',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: foreground,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextButton.styleFrom(foregroundColor: foreground),
+                child: const Text('Details'),
               ),
             ],
           ),
-        ),
+        ],
       ),
+    );
+  }
+}
+
+class _OfferPreviewPoint extends StatelessWidget {
+  const _OfferPreviewPoint({
+    required this.text,
+    required this.foreground,
+    required this.highlight,
+  });
+
+  final String text;
+  final Color foreground;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Icon(
+            Icons.check_circle_rounded,
+            size: 16,
+            color: highlight ? Colors.white : AppPalette.forest,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: foreground, height: 1.4),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1167,10 +1260,18 @@ class _OfferDetailSheet extends StatelessWidget {
   const _OfferDetailSheet({
     required this.offer,
     required this.highlight,
+    required this.hostContext,
+    required this.onBook,
   });
 
   final OfferOpportunity offer;
   final bool highlight;
+  final BuildContext hostContext;
+  final Future<SupportBooking?> Function(
+    OfferOpportunity offer,
+    DateTime scheduledFor,
+    String scheduledLabel,
+  ) onBook;
 
   @override
   Widget build(BuildContext context) {
@@ -1202,10 +1303,16 @@ class _OfferDetailSheet extends StatelessWidget {
                             background: AppPalette.mint.withValues(alpha: 0.85),
                             foreground: AppPalette.ink,
                           ),
+                          if (offer.deliveryModel.isNotEmpty)
+                            _MiniBadge(
+                              label: offer.deliveryModel,
+                              background: AppPalette.sand,
+                              foreground: AppPalette.ink,
+                            ),
                           if (offer.timeCommitment.isNotEmpty)
                             _MiniBadge(
                               label: offer.timeCommitment,
-                              background: AppPalette.sand,
+                              background: Colors.white,
                               foreground: AppPalette.ink,
                             ),
                         ],
@@ -1252,7 +1359,7 @@ class _OfferDetailSheet extends StatelessWidget {
                 ),
                 if (offer.missingData.isNotEmpty)
                   _OfferDetailListSection(
-                    title: 'What is still missing',
+                    title: 'What would make this even sharper',
                     items: offer.missingData,
                   ),
                 _OfferDetailListSection(
@@ -1269,6 +1376,31 @@ class _OfferDetailSheet extends StatelessWidget {
                     title: 'Important guardrail',
                     body: offer.caution,
                   ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          Future<void>.microtask(
+                            () => _showOfferActionSheet(
+                              hostContext,
+                              offer,
+                              onBook,
+                            ),
+                          );
+                        },
+                        child: Text(offer.primaryActionLabel),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -1278,11 +1410,298 @@ class _OfferDetailSheet extends StatelessWidget {
   }
 }
 
-class _OfferDetailSection extends StatelessWidget {
-  const _OfferDetailSection({
-    required this.title,
-    required this.body,
+class _OfferActionSheet extends StatefulWidget {
+  const _OfferActionSheet({
+    required this.offer,
+    required this.hostContext,
+    required this.onBook,
   });
+
+  final OfferOpportunity offer;
+  final BuildContext hostContext;
+  final Future<SupportBooking?> Function(
+    OfferOpportunity offer,
+    DateTime scheduledFor,
+    String scheduledLabel,
+  ) onBook;
+
+  @override
+  State<_OfferActionSheet> createState() => _OfferActionSheetState();
+}
+
+class _OfferActionSheetState extends State<_OfferActionSheet> {
+  int _selectedSlotIndex = 0;
+  bool _isBooking = false;
+
+  String get _headline {
+    switch (widget.offer.offerType) {
+      case 'appointment':
+      case 'appointment_prep':
+        return 'Book the visit';
+      case 'diagnostic':
+        return 'Book the diagnostic';
+      case 'program':
+      case 'coaching':
+        return 'Start with an intake';
+      case 'supplement':
+        return 'Request a guided review';
+      case 'starter':
+        return 'Start this from the app';
+      default:
+        return 'Choose the next step';
+    }
+  }
+
+  String get _body {
+    switch (widget.offer.offerType) {
+      case 'appointment':
+      case 'appointment_prep':
+        return 'This would route you to the clinic team for ${widget.offer.offerLabel.toLowerCase()} and confirm the right visit format.';
+      case 'diagnostic':
+        return 'This would hand you off to booking for the right lab or diagnostic slot.';
+      case 'program':
+      case 'coaching':
+        return 'This would start the intake process so the care team can tailor the plan to your current recovery stage.';
+      case 'supplement':
+        return 'This would create a clinician-reviewed supplement discussion instead of leaving you to guess on your own.';
+      case 'starter':
+        return 'This would begin a lighter-weight plan inside the app and set up the first week.';
+      default:
+        return 'This would move you into the next guided support step.';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final nextSteps = widget.offer.firstWeek.isNotEmpty
+        ? widget.offer.firstWeek.take(3).toList(growable: false)
+        : widget.offer.includes.take(3).toList(growable: false);
+    final slots = _buildOfferSlots(widget.offer);
+    final selectedSlot = slots.isEmpty
+        ? null
+        : slots[_selectedSlotIndex.clamp(0, slots.length - 1)];
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 64, 16, 16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF6F0E7),
+            borderRadius: BorderRadius.circular(32),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _headline,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: AppPalette.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                Text(
+                  widget.offer.offerLabel,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: AppPalette.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _body,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: AppPalette.ink.withValues(alpha: 0.78),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                if (widget.offer.deliveryModel.isNotEmpty ||
+                    widget.offer.timeCommitment.isNotEmpty)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (widget.offer.deliveryModel.isNotEmpty)
+                        _MiniBadge(
+                          label: widget.offer.deliveryModel,
+                          background: AppPalette.mint.withValues(alpha: 0.7),
+                          foreground: AppPalette.ink,
+                        ),
+                      if (widget.offer.timeCommitment.isNotEmpty)
+                        _MiniBadge(
+                          label: widget.offer.timeCommitment,
+                          background: AppPalette.sand,
+                          foreground: AppPalette.ink,
+                        ),
+                    ],
+                  ),
+                if (nextSteps.isNotEmpty) ...[
+                  const SizedBox(height: 22),
+                  _OfferDetailListSection(
+                    title: 'What happens next',
+                    items: nextSteps,
+                  ),
+                ],
+                if (slots.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Available demo slots',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppPalette.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      for (var index = 0; index < slots.length; index++)
+                        ChoiceChip(
+                          label: Text(slots[index].label),
+                          selected: index == _selectedSlotIndex,
+                          onSelected: _isBooking
+                              ? null
+                              : (selected) {
+                                  if (!selected) {
+                                    return;
+                                  }
+                                  setState(() {
+                                    _selectedSlotIndex = index;
+                                  });
+                                },
+                          selectedColor:
+                              AppPalette.mint.withValues(alpha: 0.86),
+                          backgroundColor: Colors.white,
+                          labelStyle: theme.textTheme.bodyMedium?.copyWith(
+                            color: AppPalette.ink,
+                            fontWeight: index == _selectedSlotIndex
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                          side: BorderSide(
+                            color: index == _selectedSlotIndex
+                                ? AppPalette.forest
+                                : AppPalette.ink.withValues(alpha: 0.08),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: selectedSlot == null || _isBooking
+                            ? null
+                            : () async {
+                                setState(() {
+                                  _isBooking = true;
+                                });
+                                final booking = await widget.onBook(
+                                  widget.offer,
+                                  selectedSlot.scheduledFor,
+                                  selectedSlot.label,
+                                );
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                setState(() {
+                                  _isBooking = false;
+                                });
+                                Navigator.of(context).pop();
+                                if (booking != null) {
+                                  ScaffoldMessenger.of(widget.hostContext)
+                                      .showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Booked ${widget.offer.offerLabel} for ${selectedSlot.label}.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                        child: Text(
+                          _isBooking
+                              ? 'Booking...'
+                              : widget.offer.primaryActionLabel,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    TextButton(
+                      onPressed:
+                          _isBooking ? null : () => Navigator.of(context).pop(),
+                      child: const Text('Maybe later'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OfferSlotOption {
+  const _OfferSlotOption({
+    required this.label,
+    required this.scheduledFor,
+  });
+
+  final String label;
+  final DateTime scheduledFor;
+}
+
+List<_OfferSlotOption> _buildOfferSlots(OfferOpportunity offer) {
+  final now = DateTime.now();
+  final baseHour = switch (offer.offerType) {
+    'diagnostic' => 8,
+    'program' || 'coaching' => 10,
+    'supplement' => 15,
+    _ => 9,
+  };
+  final offsets = switch (offer.offerType) {
+    'diagnostic' => <int>[3, 6, 10],
+    'program' || 'coaching' => <int>[2, 5, 9],
+    'starter' => <int>[1, 3, 7],
+    _ => <int>[2, 5, 8],
+  };
+
+  final formatter = DateFormat('EEE d MMM • HH:mm');
+  return offsets.map((days) {
+    final scheduledFor = DateTime(
+      now.year,
+      now.month,
+      now.day + days,
+      baseHour,
+      days == offsets.first ? 0 : 30,
+    );
+    return _OfferSlotOption(
+      label: formatter.format(scheduledFor),
+      scheduledFor: scheduledFor,
+    );
+  }).toList(growable: false);
+}
+
+class _OfferDetailSection extends StatelessWidget {
+  const _OfferDetailSection({required this.title, required this.body});
 
   final String title;
   final String body;
@@ -1321,10 +1740,7 @@ class _OfferDetailSection extends StatelessWidget {
 }
 
 class _OfferDetailListSection extends StatelessWidget {
-  const _OfferDetailListSection({
-    required this.title,
-    required this.items,
-  });
+  const _OfferDetailListSection({required this.title, required this.items});
 
   final String title;
   final List<String> items;
@@ -1355,11 +1771,7 @@ class _OfferDetailListSection extends StatelessWidget {
               children: [
                 const Padding(
                   padding: EdgeInsets.only(top: 6),
-                  child: Icon(
-                    Icons.circle,
-                    size: 8,
-                    color: AppPalette.forest,
-                  ),
+                  child: Icon(Icons.circle, size: 8, color: AppPalette.forest),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -1382,10 +1794,7 @@ class _OfferDetailListSection extends StatelessWidget {
 }
 
 class ChatBubble extends StatelessWidget {
-  const ChatBubble({
-    super.key,
-    required this.message,
-  });
+  const ChatBubble({super.key, required this.message});
 
   final ChatMessage message;
 
@@ -1409,10 +1818,9 @@ class ChatBubble extends StatelessWidget {
           ),
           child: Text(
             message.text,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: foreground,
-                  height: 1.45,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: foreground, height: 1.45),
           ),
         ),
       ],
@@ -1451,10 +1859,7 @@ class EmptyStateCard extends StatelessWidget {
                   height: 1.4,
                 ),
               ),
-              if (action != null) ...[
-                const SizedBox(height: 18),
-                action!,
-              ],
+              if (action != null) ...[const SizedBox(height: 18), action!],
             ],
           ),
         ),
@@ -1658,10 +2063,7 @@ _BadgeAppearance _appearanceForState(String raw) {
 }
 
 class _HeroMetric extends StatelessWidget {
-  const _HeroMetric({
-    required this.label,
-    required this.value,
-  });
+  const _HeroMetric({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -1699,10 +2101,7 @@ class _HeroMetric extends StatelessWidget {
 }
 
 class _HeroPill extends StatelessWidget {
-  const _HeroPill({
-    required this.label,
-    required this.value,
-  });
+  const _HeroPill({required this.label, required this.value});
 
   final String label;
   final String value;

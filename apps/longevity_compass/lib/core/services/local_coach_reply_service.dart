@@ -6,6 +6,8 @@ class LocalCoachReplyService {
   CoachReply buildReply({
     required ExperienceSnapshot experience,
     required String message,
+    CustomerProfile? customerProfile,
+    List<SupportBooking> supportBookings = const [],
   }) {
     final focus = experience.weeklyPlan.primaryFocus;
     final care = experience.careContext;
@@ -16,11 +18,58 @@ class LocalCoachReplyService {
         : 'follow this week\'s plan';
     final recommendedOffer = experience.offers.recommended;
     final signalSummary = _buildSignalSummary(experience);
+    final isWelcomeJourney = customerProfile?.isWelcomeJourney ?? false;
+    final nextBooking =
+        supportBookings.isNotEmpty ? supportBookings.first : null;
 
     var reply =
         'The clearest focus right now is ${focus.pillarName.toLowerCase()}. '
         '${focus.whyNow} '
         'This week, start with $firstAction.';
+
+    if (isWelcomeJourney) {
+      reply =
+          'You are still in the setup stage, so the best next step is to keep this simple. '
+          'Connect one useful source, tell me what outcome matters most to you, and I can guide you from there.';
+
+      if (_containsAny(lowerMessage, const [
+        'what can you do',
+        'help',
+        'start',
+        'new here',
+      ])) {
+        reply =
+            'I can help you choose the first data source to connect, explain what each clinic offer is for, and keep the first week simple. '
+            'A smartwatch or your last doctor summary is usually enough to get started.';
+      } else if (_containsAny(lowerMessage, const [
+        'watch',
+        'wearable',
+        'connect',
+        'data source',
+      ])) {
+        reply =
+            'The fastest first connection is usually a smartwatch or ring because it starts showing sleep, movement, and recovery trends quickly. '
+            'If you already have active medical care, adding your last doctor summary is the next best thing.';
+      } else if (_containsAny(lowerMessage, const [
+        'book',
+        'visit',
+        'screening',
+        'intake',
+        'lab',
+      ])) {
+        if (nextBooking != null) {
+          reply =
+              'You already booked ${nextBooking.offerLabel} for ${nextBooking.scheduledLabel}. '
+              'That means the smartest next step is to connect one useful source before that appointment if you can.';
+        } else if (recommendedOffer != null) {
+          reply =
+              'The clearest first support option is ${recommendedOffer.offerLabel}. '
+              '${recommendedOffer.summary}';
+        }
+      }
+
+      return CoachReply(reply: reply.trim(), primaryFocus: focus);
+    }
 
     if (_containsAny(lowerMessage, const [
       'summarize',

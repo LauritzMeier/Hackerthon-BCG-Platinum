@@ -36,6 +36,15 @@ FOCUS_CODE_PREFIXES = {
     "mental_resilience": ("F",),
 }
 
+CARDIO_CONDITIONS = {
+    "coronary_artery_disease",
+    "heart_failure",
+    "hypertension",
+    "atrial_fibrillation",
+}
+
+CARDIO_VISIT_PREFIXES = ("I20", "I21", "I22", "I25", "I50")
+
 
 def split_pipe_values(value) -> List[str]:
     return [item.strip() for item in str(value or "").split("|") if item.strip()]
@@ -61,18 +70,18 @@ def label_icd(code: str) -> str:
 def parse_visit_history(value) -> List[Dict]:
     visits: List[Dict] = []
     for entry in split_pipe_values(value):
-      if ":" in entry:
-        date_part, code = entry.split(":", 1)
-      else:
-        date_part, code = "", entry
+        if ":" in entry:
+            date_part, code = entry.split(":", 1)
+        else:
+            date_part, code = "", entry
 
-      visits.append(
-          {
-              "date": date_part,
-              "code": code,
-              "label": label_icd(code),
-          }
-      )
+        visits.append(
+            {
+                "date": date_part,
+                "code": code,
+                "label": label_icd(code),
+            }
+        )
     return visits
 
 
@@ -97,6 +106,58 @@ def _select_relevant_visit(visits: List[Dict], primary_focus: Dict) -> Optional[
                 return visit
 
     return visits[-1]
+
+
+def _has_cardiovascular_context(bundle: Dict, primary_focus: Dict) -> bool:
+    if primary_focus.get("pillar_id") == "cardiovascular_health":
+        return True
+
+    profile = bundle["profile"]
+    conditions = set(split_pipe_values(profile.get("chronic_conditions")))
+    if conditions.intersection(CARDIO_CONDITIONS):
+        return True
+
+    visits = parse_visit_history(profile.get("visit_history"))
+    return any(
+        visit.get("code", "").startswith(CARDIO_VISIT_PREFIXES)
+        for visit in visits
+    )
+
+
+def _needs_cardiology_follow_up(bundle: Dict) -> bool:
+    profile = bundle["profile"]
+    conditions = set(split_pipe_values(profile.get("chronic_conditions")))
+    if conditions.intersection({"coronary_artery_disease", "heart_failure"}):
+        return True
+
+    visits = parse_visit_history(profile.get("visit_history"))
+    return any(
+        visit.get("code", "").startswith(CARDIO_VISIT_PREFIXES)
+        for visit in visits
+    )
+
+
+def _select_support_recommended_offer(
+    bundle: Dict,
+    primary_focus: Dict,
+    recommended_offer: Optional[Dict],
+) -> Optional[Dict]:
+    raw_offers = bundle.get("offers", [])
+
+    if _needs_cardiology_follow_up(bundle):
+        return {
+            "offer_code": "cardiology_follow_up_visit",
+            "offer_label": "Cardiology follow-up visit",
+            "priority": 1,
+            "rationale": "Heart-related follow-up is still active, so the clearest support offer is a concrete cardiology visit.",
+        }
+
+    if _has_cardiovascular_context(bundle, primary_focus):
+        for offer in raw_offers:
+            if offer.get("offer_code") == "preventive_cardiometabolic_panel":
+                return offer
+
+    return recommended_offer
 
 
 def build_care_context(bundle: Dict, primary_focus: Dict) -> Dict:
@@ -323,6 +384,9 @@ def _offer_blueprint(
         "personalization_note": _format_offer_template(
             blueprint["personalization_note"], primary_focus, care_context, data_coverage
         ),
+        "cta_label": _format_offer_template(
+            blueprint.get("cta_label", ""), primary_focus, care_context, data_coverage
+        ),
         "active": bool(blueprint.get("active", True)),
         "sort_order": blueprint.get("sort_order", 999),
     }
@@ -352,6 +416,7 @@ def enrich_offer(
             "first_week": blueprint["first_week"],
             "caution": blueprint["caution"],
             "personalization_note": blueprint["personalization_note"],
+            "cta_label": blueprint["cta_label"],
             "active": blueprint["active"],
             "sort_order": blueprint["sort_order"],
         }
@@ -367,16 +432,63 @@ def build_offer_summary(
     data_coverage: Dict,
 ) -> Dict:
     raw_offers = bundle.get("offers", [])
-    recommended_code = recommended_offer.get("offer_code") if recommended_offer else None
+    selected_recommended = _select_support_recommended_offer(
+        bundle,
+        primary_focus,
+        recommended_offer,
+    )
+    recommended_code = (
+        selected_recommended.get("offer_code") if selected_recommended else None
+    )
+    is_cardio_context = _has_cardiovascular_context(bundle, primary_focus)
 
     additional_items: List[Dict] = []
+    if is_cardio_context:
+        additional_items.extend(
+            [
+                enrich_offer(
+                    {
+                        "offer_code": "cardiac_rehab_intake",
+                        "offer_label": "Cardiac rehab intake",
+                        "priority": 2,
+                        "rationale": "A supervised recovery plan can turn uncertainty into a safer return to activity.",
+                    },
+                    primary_focus,
+                    care_context,
+                    data_coverage,
+                ),
+                enrich_offer(
+                    {
+                        "offer_code": "advanced_lipid_lab_panel",
+                        "offer_label": "Advanced lipid lab panel",
+                        "priority": 3,
+                        "rationale": "Stronger lipid detail can make the next cardiovascular review more concrete.",
+                    },
+                    primary_focus,
+                    care_context,
+                    data_coverage,
+                ),
+                enrich_offer(
+                    {
+                        "offer_code": "heart_health_supplement_review",
+                        "offer_label": "Heart health supplement review",
+                        "priority": 4,
+                        "rationale": "Supplement decisions only add value once they are grounded in the current medical plan.",
+                    },
+                    primary_focus,
+                    care_context,
+                    data_coverage,
+                ),
+            ]
+        )
+
     if care_context.get("last_appointment_summary"):
         additional_items.append(
             enrich_offer(
                 {
                     "offer_code": "follow_up_prep",
                     "offer_label": "Next appointment prep",
-                    "priority": 2,
+                    "priority": 5 if is_cardio_context else 2,
                     "rationale": "Turn your existing care context into clear follow-up questions.",
                 },
                 primary_focus,
@@ -391,7 +503,7 @@ def build_offer_summary(
                 {
                     "offer_code": "meal_tracking_reset",
                     "offer_label": "7-day meal tracking starter",
-                    "priority": 3,
+                    "priority": 7 if is_cardio_context else 3,
                     "rationale": "You need better food signal before nutrition support can become truly personal.",
                 },
                 primary_focus,
@@ -403,8 +515,14 @@ def build_offer_summary(
     for offer in raw_offers:
         if offer.get("offer_code") == recommended_code:
             continue
+        raw_offer = dict(offer)
+        if is_cardio_context and raw_offer.get("offer_code") == "movement_program":
+            raw_offer["priority"] = max(raw_offer.get("priority", 99), 6)
+            raw_offer["rationale"] = (
+                "Structured movement support still helps, but clinic-facing cardiac offers should come first."
+            )
         additional_items.append(
-            enrich_offer(offer, primary_focus, care_context, data_coverage)
+            enrich_offer(raw_offer, primary_focus, care_context, data_coverage)
         )
 
     seen_codes = set()
@@ -427,9 +545,14 @@ def build_offer_summary(
 
     return {
         "recommended": (
-            enrich_offer(recommended_offer, primary_focus, care_context, data_coverage)
-            if recommended_offer
+            enrich_offer(
+                selected_recommended,
+                primary_focus,
+                care_context,
+                data_coverage,
+            )
+            if selected_recommended
             else None
         ),
-        "additional_items": deduped_additional[:3],
+        "additional_items": deduped_additional[:4],
     }
