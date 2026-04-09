@@ -21,7 +21,8 @@ It should unify:
 
 - current health understanding
 - future trajectory
-- weekly action
+- goal definition
+- goal tracking
 - coach interaction
 - monetization moments
 
@@ -116,11 +117,13 @@ This should usually be:
 - the fastest-worsening pillar
 - or the most commercially and clinically relevant pillar
 
-### 5. Weekly Action Plan
+### 5. Goal Definition
 
-Translate the compass into 2-3 realistic actions the user can do this week.
+Translate the compass into 2-3 realistic goals the user can review, accept, and work on this week.
 
-These actions should explicitly map back to one or two pillars.
+These goals should explicitly map back to one or two pillars.
+
+They should be proposed conversationally by the chatbot rather than silently generated in the background.
 
 ### 6. Coach Chat
 
@@ -131,10 +134,24 @@ It should help the user:
 - understand their pillar state
 - understand their trajectory
 - ask follow-up questions
-- adapt the plan
+- define goals
+- adapt proposed goals
 - decide whether to book further support
 
-### 7. Relevant Next Best Offer
+### 7. Goals Workspace
+
+Accepted goals should live in a dedicated goals page.
+
+That page should only show goals the user has explicitly accepted.
+
+It should become the place to review:
+
+- active goals
+- completion state
+- why each goal was recommended
+- whether a goal needs to be revised with the chatbot
+
+### 8. Relevant Next Best Offer
 
 If the user needs more than self-guided action, the app should surface the most relevant next step.
 
@@ -153,8 +170,9 @@ That includes:
 
 - weekly summaries
 - chatbot prompts
+- goals
+- goal updates
 - push notifications
-- action plans
 - alerts
 - diagnostics recommendations
 - upsell or premium moments
@@ -176,9 +194,9 @@ Best mobile use cases:
 
 - daily or weekly check-ins
 - coach chat
+- goal acceptance and review
 - nudges
 - progress updates
-- simple action plans
 - fast explanation of changes
 
 Mobile should optimize for:
@@ -201,6 +219,7 @@ Best web use cases:
 
 - richer onboarding
 - deep review of the longevity compass
+- reviewing active and completed goals
 - historical trend exploration
 - booking diagnostics or programs
 - reviewing longer summaries or reports
@@ -214,27 +233,42 @@ Web should optimize for:
 
 Firebase implications:
 
-- Firebase App Hosting or Hosting supports the web delivery layer
+- Firebase Hosting supports the Flutter web delivery layer
 - Firebase Authentication keeps identity consistent across mobile and web
 
-## Core Screens
+## Top-Level App Pages
 
-### Mobile
+The current information architecture should stay intentionally simple:
 
-1. Home Compass
-2. Ask The Coach
-3. Weekly Plan
-4. Pillar Detail
-5. Alerts And Opportunities
-6. Progress
+1. Main Page
+   The Longevity Compass with the six pillars, current status, overall direction, and primary focus area
+2. Chatbot
+   The left-navigation conversational surface for explanation, follow-up questions, and goal definition
+3. Goals
+   The right-navigation page that stores goals only after the user has accepted them in chat
 
-### Web
+Additional detail such as pillar explanations, alerts, and relevant offers can open contextually from these three pages rather than as separate top-level destinations.
 
-1. Detailed Compass Review
-2. Six Pillar Trend Explorer
-3. Personalized Recommendations
-4. Offer And Booking Flow
-5. Account And Preferences
+## Current MVP Build Slice
+
+The current build should focus on three connected surfaces:
+
+1. Main Page
+   The six pillars, current status, overall direction, and primary focus area
+2. Chatbot
+   Conversational explanation, goal definition, and confidence-building
+3. Goals
+   Accepted goals, goal review, and lightweight progress tracking
+
+The key interaction loop is:
+
+- the user reviews the compass on the main page
+- the chatbot helps define or refine goals
+- accepted goals appear in the goals page
+
+The design rule is simple:
+
+- if a screen cannot be explained as an output of the compass, it does not belong in the first MVP
 
 ## Monetization Model
 
@@ -268,7 +302,7 @@ The concept is working if users can quickly answer:
 - what is my current status?
 - which pillar is driving my status?
 - why did this change?
-- what should I do this week?
+- which goals should I accept and work on now?
 - when should I consider more support?
 
 ## Recommended MVP Slice
@@ -277,9 +311,9 @@ For the first MVP, the most coherent slice is:
 
 - one primary persona
 - one main compass home screen
-- one weekly update loop
+- one chatbot-led goal definition loop
+- one goals page for accepted goals
 - one risk-drift flow
-- one chatbot entry point
 - one clear offer path
 
 That is enough to demonstrate both retention and monetization logic without overbuilding.

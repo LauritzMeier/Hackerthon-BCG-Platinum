@@ -24,4 +24,5 @@ Architecture Decision Records capture durable choices that shape this repository
 - [0005-documentation-first-operating-model.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/0005-documentation-first-operating-model.md)
 - [0006-google-first-mvp-architecture.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/0006-google-first-mvp-architecture.md)
 - [0007-longevity-compass-core-experience.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/0007-longevity-compass-core-experience.md)
+- [0008-hybrid-retention-and-monetization-loop.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/0008-hybrid-retention-and-monetization-loop.md)
 - [template.md](/Users/lauritz/git/Hackerthon-BCG-Platinum/docs/adr/template.md)

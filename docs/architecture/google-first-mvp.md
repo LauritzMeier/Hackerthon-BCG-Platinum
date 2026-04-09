@@ -40,7 +40,7 @@ This should be treated as the default implementation direction unless we explici
 
 Firebase should be the default platform layer for the MVP:
 
-- Firebase App Hosting or Firebase Hosting for the web experience
+- Firebase Hosting for the Flutter web companion experience
 - Firebase Authentication for sign-in
 - Cloud Firestore for app state and coach sessions
 - Firebase Cloud Messaging for notifications and re-engagement
@@ -52,8 +52,9 @@ This gives us one coherent app platform across iOS, Android, and web.
 
 ### Frontend
 
-- Firebase Hosting or Firebase App Hosting for the web companion experience
-- the web experience can be delivered either from Flutter Web or from a separate web surface if needed later
+- Flutter is the chosen client stack for iOS, Android, and the companion web experience
+- Firebase Hosting is the default delivery path for Flutter Web
+- Firebase App Hosting should only be considered later if we introduce a separate framework-based web surface
 
 ### Mobile
 
@@ -174,6 +175,18 @@ Keep both of these ideas true:
 - Google Cloud is the primary target for hosted MVP deployment
 
 That means DuckDB is now a development convenience, while Firebase plus Google Cloud form the real MVP architecture story.
+
+## Current Implementation Slice
+
+The current repo should support this path:
+
+1. Local DuckDB for rapid data and payload iteration
+2. FastAPI for the app-facing Compass API
+3. Flutter app source checked into `apps/longevity_compass/`
+4. Firebase reserved for authentication, analytics, notifications, crash monitoring, and web hosting
+5. Cloud Run as the deployment target for the Python API
+
+The Flutter app can be scaffolded in source form before generated platform folders are added. Once the Flutter toolchain is available, run `flutter create . --platforms=ios,android,web` inside the app directory to generate the platform shell around the checked-in app code.
 
 ## Recommended Build Sequence
 

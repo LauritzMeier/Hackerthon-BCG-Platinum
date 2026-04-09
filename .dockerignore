@@ -1,0 +1,11 @@
+.git
+.venv
+__pycache__
+*.pyc
+.DS_Store
+apps/*/.dart_tool
+apps/*/build
+data/warehouse/*
+!data/warehouse/.gitkeep
+data/exports/*
+!data/exports/.gitkeep

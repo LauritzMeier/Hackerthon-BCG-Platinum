@@ -63,6 +63,7 @@ docs/
   product/
   architecture/
   adr/
+apps/
 scripts/
 sql/
 src/

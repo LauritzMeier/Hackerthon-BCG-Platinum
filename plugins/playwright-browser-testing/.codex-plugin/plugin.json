@@ -1,0 +1,33 @@
+{
+  "name": "playwright-browser-testing",
+  "version": "0.1.0",
+  "description": "Repo-local Codex plugin that exposes the official Playwright MCP server for browser testing.",
+  "homepage": "https://playwright.dev/docs/getting-started-mcp",
+  "repository": "https://github.com/microsoft/playwright-mcp",
+  "license": "Apache-2.0",
+  "keywords": [
+    "playwright",
+    "browser-testing",
+    "mcp"
+  ],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Playwright Browser Testing",
+    "shortDescription": "Open and test the app in a real browser through Playwright MCP.",
+    "longDescription": "Adds the official Playwright MCP server to this workspace so Codex can open the app, interact with flows, and validate UI changes in a real browser session.",
+    "developerName": "Hackerthon-BCG-Platinum",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Browser Automation",
+      "Testing"
+    ],
+    "websiteURL": "https://playwright.dev/docs/getting-started-mcp",
+    "defaultPrompt": [
+      "Open the local app in the browser and smoke test the main flow.",
+      "Check the compass page in a real browser after UI changes.",
+      "Verify the goals flow end to end with Playwright MCP."
+    ],
+    "brandColor": "#2EAD33"
+  }
+}
