@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "102290354167",
+    "project_id": "ai-hack26ham-435",
+    "storage_bucket": "ai-hack26ham-435.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:102290354167:android:7bf70f9ec1c5daaae8c8f2",
+        "android_client_info": {
+          "package_name": "com.bcgplatinion.longevity.longevity_compass"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcGcdrTmwCI6Jg-bNOGg3Zh1xZiNH8ez0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

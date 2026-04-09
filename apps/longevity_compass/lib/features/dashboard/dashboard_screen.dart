@@ -177,6 +177,7 @@ class _PatientPicker extends StatelessWidget {
       width: 240,
       child: DropdownButtonFormField<String>(
         initialValue: selectedPatientId,
+        isExpanded: true,
         decoration: const InputDecoration(
           labelText: 'Demo patient',
         ),
@@ -184,7 +185,10 @@ class _PatientPicker extends StatelessWidget {
             .map(
               (patient) => DropdownMenuItem<String>(
                 value: patient.patientId,
-                child: Text(patient.displayLabel),
+                child: Text(
+                  patient.displayLabel,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             )
             .toList(growable: false),

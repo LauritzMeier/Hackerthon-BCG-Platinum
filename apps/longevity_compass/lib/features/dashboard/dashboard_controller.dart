@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../core/firebase/firestore_chat_service.dart';
 import '../../core/models/experience_models.dart';
 import '../../core/services/experience_repository.dart';
 
@@ -17,6 +18,8 @@ class DashboardController extends ChangeNotifier {
   ExperienceSnapshot? experience;
   List<ChatMessage> chatMessages = <ChatMessage>[];
   String? selectedPatientId;
+  String? firebaseUserId;
+  String? firestoreStatusMessage;
 
   Future<void> load() async {
     isLoading = true;
@@ -24,6 +27,7 @@ class DashboardController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      await _initializeFirebaseSession();
       patients = await _repository.fetchPatients();
       selectedPatientId = _resolveInitialPatientId();
       await _loadCurrentExperience();
@@ -80,27 +84,69 @@ class DashboardController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final userWriteResult = await _repository.persistChatMessage(
+        patientId,
+        ChatMessage.user(trimmed),
+      );
+      _updateFirestoreStatus(userWriteResult);
+
       final reply = await _repository.sendCoachMessage(patientId, trimmed);
-      chatMessages = <ChatMessage>[
-        ...chatMessages,
-        ChatMessage.assistant(reply.reply),
-      ];
+      final assistantMessage = ChatMessage.assistant(reply.reply);
+      chatMessages = <ChatMessage>[...chatMessages, assistantMessage];
+
+      final assistantWriteResult = await _repository.persistChatMessage(
+        patientId,
+        assistantMessage,
+      );
+      _updateFirestoreStatus(assistantWriteResult);
     } catch (error) {
       errorMessage = error.toString();
-      chatMessages = <ChatMessage>[
-        ...chatMessages,
-        ChatMessage.assistant(
-          'I could not reach the coach service just now, but your weekly plan is still available.',
-        ),
-      ];
+      final fallbackMessage = ChatMessage.assistant(
+        'I could not reach the coach service just now, but your weekly plan is still available.',
+      );
+      chatMessages = <ChatMessage>[...chatMessages, fallbackMessage];
+
+      final fallbackWriteResult = await _repository.persistChatMessage(
+        patientId,
+        fallbackMessage,
+      );
+      _updateFirestoreStatus(fallbackWriteResult);
     } finally {
       isSendingMessage = false;
       notifyListeners();
     }
   }
 
+  bool get isFirebaseEnabled => _repository.isFirebaseEnabled;
+
+  String get firestoreMessagesPath {
+    final patientId = selectedPatientId ?? '<patient-id>';
+    return 'coach_conversations/$patientId/messages';
+  }
+
+  Future<void> _initializeFirebaseSession() async {
+    if (!_repository.isFirebaseEnabled) {
+      firebaseUserId = null;
+      firestoreStatusMessage = 'Firebase sync is disabled for this build.';
+      return;
+    }
+
+    firebaseUserId = await _repository.ensureFirebaseSession();
+    firestoreStatusMessage = firebaseUserId == null
+        ? (_repository.firebaseSessionError ??
+            'Firebase auth is configured, but anonymous sign-in did not succeed yet.')
+        : 'Firestore sync active as anonymous user ${firebaseUserId!.substring(0, 8)}.';
+  }
+
+  void _updateFirestoreStatus(FirestoreChatWriteResult result) {
+    firebaseUserId =
+        result.userId ?? firebaseUserId ?? _repository.currentFirebaseUserId;
+    firestoreStatusMessage = result.statusMessage;
+  }
+
   String _resolveInitialPatientId() {
-    if (patients.any((patient) => patient.patientId == _repository.defaultPatientId)) {
+    if (patients
+        .any((patient) => patient.patientId == _repository.defaultPatientId)) {
       return _repository.defaultPatientId;
     }
     if (patients.isNotEmpty) {
@@ -116,9 +162,12 @@ class DashboardController extends ChangeNotifier {
     }
 
     experience = await _repository.fetchExperience(patientId);
-    chatMessages = <ChatMessage>[
-      ChatMessage.assistant(experience!.coach.intro),
-    ];
+    final storedMessages = await _repository.fetchChatMessages(patientId);
+    chatMessages = storedMessages.isNotEmpty
+        ? storedMessages
+        : <ChatMessage>[
+            ChatMessage.assistant(experience!.coach.intro),
+          ];
   }
 
   @override

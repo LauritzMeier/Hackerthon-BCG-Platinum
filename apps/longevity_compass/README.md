@@ -45,11 +45,19 @@ Configure Firebase when you are ready to connect the app to a real Firebase proj
 ./scripts/setup_firebase.sh --project your-firebase-project-id
 ```
 
+Publish the current local warehouse into Firestore so the app can read patient
+data from Firebase:
+
+```bash
+./scripts/sync_firestore.sh --project your-firebase-project-id
+```
+
 Then use the scripted launchers from the repo root:
 
 ```bash
 ./scripts/run_ios.sh
 ./scripts/run_android.sh
+./scripts/run_web.sh
 ```
 
 Useful options:
@@ -59,6 +67,7 @@ Useful options:
 ./scripts/run_android.sh --physical --device-id RFCW90RPXXV
 ./scripts/run_android.sh --firebase-project your-firebase-project-id
 ./scripts/run_ios.sh --firebase-project your-firebase-project-id
+./scripts/run_web.sh --firebase-project your-firebase-project-id
 ```
 
 Both run scripts:
@@ -69,6 +78,15 @@ Both run scripts:
 - auto-configure Firebase on first launch when `.env.local` already contains `FIREBASE_PROJECT_ID`
 - auto-load `.env.local` for your Firebase project and local runtime defaults
 - warn if the backend API is not running at the expected local address
+
+With Firebase enabled, the app reads its main data from Firestore:
+
+- `patient_summaries`
+- `patient_experiences`
+
+Coach message persistence stays in:
+
+- `coach_conversations/{patientId}/messages`
 
 ## Current Environment
 

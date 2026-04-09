@@ -57,6 +57,35 @@ class _CoachScreenState extends State<CoachScreen> {
             ),
             const SizedBox(height: 24),
             SectionSurface(
+              title: 'Firestore conversation sync',
+              subtitle:
+                  'Every send can be mirrored to `${controller.firestoreMessagesPath}` for clinic demos and backend handoff testing.',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    controller.firestoreStatusMessage ??
+                        'Firebase session status has not been checked yet.',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    controller.isFirebaseEnabled
+                        ? 'Authentication mode: Firebase anonymous sign-in.'
+                        : 'Enable Firebase with `APP_ENABLE_FIREBASE=true` to persist messages.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.color
+                              ?.withValues(alpha: 0.72),
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SectionSurface(
               title: 'Suggested prompts',
               child: Wrap(
                 spacing: 10,
@@ -74,7 +103,8 @@ class _CoachScreenState extends State<CoachScreen> {
             const SizedBox(height: 24),
             SectionSurface(
               title: 'Conversation',
-              subtitle: 'A supportive, plain-language layer over your plan, flags, and offers.',
+              subtitle:
+                  'A supportive, plain-language layer over your plan, flags, and offers.',
               child: Column(
                 children: [
                   for (final message in controller.chatMessages) ...[
@@ -102,7 +132,8 @@ class _CoachScreenState extends State<CoachScreen> {
                     minLines: 1,
                     maxLines: 4,
                     decoration: const InputDecoration(
-                      hintText: 'Ask why a pillar is drifting or how to adapt the plan.',
+                      hintText:
+                          'Ask why a pillar is drifting or how to adapt the plan.',
                     ),
                     onSubmitted: (value) => _send(controller, value),
                   ),
