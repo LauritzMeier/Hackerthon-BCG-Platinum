@@ -4,6 +4,35 @@ This folder contains a Google Cloud ADK agent configured to use Firestore projec
 
 - `longevity-compass-firestore` (Firestore Native, region `eur3`)
 
+## Capabilities
+
+The agent exposes tools for:
+
+- writing a startup and manual test message to Firestore
+- analyzing all six longevity pillars for a given patient id
+- explaining one specific pillar in plain language with key signals
+- generating a tailored coaching explanation package with:
+  - evidence-backed claims
+  - trade-offs
+  - next-best actions
+  - required safety guardrails and uncertainty language
+
+The six pillars are:
+
+- `sleep_recovery`
+- `cardiovascular_health`
+- `metabolic_health`
+- `movement_fitness`
+- `nutrition_quality`
+- `mental_resilience`
+
+Analysis combines:
+
+- `data/raw/ehr_records.csv`
+- `data/raw/lifestyle_survey.csv`
+- `data/raw/wearable_telemetry_1.csv`
+- Firestore patient documents (if present) from common collections
+
 ## What happens first
 
 When `main.py` loads, it immediately writes a startup test document to:
@@ -40,3 +69,22 @@ python3 agent/main.py
 
 If credentials are valid, a test document is created in Firestore collection
 `agent_test_messages`.
+
+## Run streaming API
+
+```bash
+uvicorn agent.server:app --host 0.0.0.0 --port 8080
+```
+
+### Endpoints
+
+- `POST /explain` returns a full response payload (batch)
+- `POST /explain/stream` streams SSE deltas for real-time feedback
+
+Example stream call:
+
+```bash
+curl -N -X POST http://127.0.0.1:8080/explain/stream \
+  -H "Content-Type: application/json" \
+  -d '{"patient_id":"PT0001"}'
+```
