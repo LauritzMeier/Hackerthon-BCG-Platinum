@@ -6,6 +6,241 @@ import random
 import re
 from typing import Any, Dict, List
 
+PERSONA_LIBRARY = [
+    {
+        "name": "Markus",
+        "country": "Germany",
+        "age": 56,
+        "life_stage": "senior executive",
+        "digital_fluency": "medium",
+        "main_motivation": "stay healthy and productive without feeling old",
+        "main_fear": "a silent cardiovascular event that interrupts work and family plans",
+        "tone": "concise and credibility-first",
+    },
+    {
+        "name": "Sofia",
+        "country": "Spain",
+        "age": 41,
+        "life_stage": "working parent",
+        "digital_fluency": "medium",
+        "main_motivation": "feel in control again without adding another burden",
+        "main_fear": "burning out while ignoring early warning signs",
+        "tone": "empathetic and sustainable",
+    },
+    {
+        "name": "Claire",
+        "country": "France",
+        "age": 67,
+        "life_stage": "active retiree",
+        "digital_fluency": "low-medium",
+        "main_motivation": "stay active and independent as long as possible",
+        "main_fear": "gradual quality-of-life decline",
+        "tone": "simple and independence-focused",
+    },
+    {
+        "name": "Johanna",
+        "country": "Austria",
+        "age": 61,
+        "life_stage": "pre-retirement professional",
+        "digital_fluency": "medium",
+        "main_motivation": "enter retirement in strong health with decisions she can trust",
+        "main_fear": "discovering prevention risk too late",
+        "tone": "trust-heavy and practical",
+    },
+    {
+        "name": "Luca",
+        "country": "Italy",
+        "age": 29,
+        "life_stage": "shift worker",
+        "digital_fluency": "high",
+        "main_motivation": "better daily energy and recovery",
+        "main_fear": "falling into unhealthy routines he cannot sustainably fix",
+        "tone": "fast, low-friction, affordable-feeling",
+    },
+    {
+        "name": "Anika",
+        "country": "Netherlands",
+        "age": 46,
+        "life_stage": "dual-career professional",
+        "digital_fluency": "high",
+        "main_motivation": "optimize healthspan with measurable personalization",
+        "main_fear": "paying for generic wellness without real value",
+        "tone": "precise and measurable",
+    },
+    {
+        "name": "Tomasz",
+        "country": "Poland",
+        "age": 52,
+        "life_stage": "small business owner",
+        "digital_fluency": "medium-low",
+        "main_motivation": "prevent a bigger problem without a complicated program",
+        "main_fear": "developing diabetes or heart disease while too busy to notice",
+        "tone": "direct and ROI-focused",
+    },
+    {
+        "name": "Ingrid",
+        "country": "Sweden",
+        "age": 34,
+        "life_stage": "health-aware knowledge worker",
+        "digital_fluency": "high",
+        "main_motivation": "make prevention more scientific and less guesswork",
+        "main_fear": "missing an early pattern while appearing healthy",
+        "tone": "evidence-led and nuanced",
+    },
+    {
+        "name": "Elise",
+        "country": "Belgium",
+        "age": 74,
+        "life_stage": "fixed-income retiree",
+        "digital_fluency": "low",
+        "main_motivation": "maintain independence and avoid sudden deterioration",
+        "main_fear": "being overwhelmed by either medical or digital complexity",
+        "tone": "gentle, clear, and reassuring",
+    },
+]
+
+
+def _as_int(value: Any) -> int | None:
+    try:
+        if value in (None, ""):
+            return None
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _digital_signal_limit(digital_fluency: str) -> int:
+    level = digital_fluency.lower()
+    if "low" in level:
+        return 3
+    if "medium" in level:
+        return 4
+    return 5
+
+
+def _age_guidance(age: int | None) -> Dict[str, str]:
+    if age is None:
+        return {
+            "frame": "keep the advice practical and grounded in the current data",
+            "next_step_style": "one realistic next step",
+        }
+    if age >= 70:
+        return {
+            "frame": "protect independence and avoid overwhelm",
+            "next_step_style": "one simple next step that feels manageable",
+        }
+    if age >= 60:
+        return {
+            "frame": "protect long-term independence with clear, trustworthy prevention logic",
+            "next_step_style": "one clear prevention step with obvious benefit",
+        }
+    if age >= 45:
+        return {
+            "frame": "keep prevention credible and worth the time investment",
+            "next_step_style": "one high-ROI step that fits a busy week",
+        }
+    if age >= 35:
+        return {
+            "frame": "build sustainable control without adding another burden",
+            "next_step_style": "one sustainable habit change rather than a full reset",
+        }
+    return {
+        "frame": "protect energy and recovery with routines you can actually sustain",
+        "next_step_style": "one lightweight, high-feedback habit",
+    }
+
+
+def derive_persona_context(profile: Dict[str, Any]) -> Dict[str, Any]:
+    age = _as_int(profile.get("age"))
+    country = str(profile.get("country") or "").strip()
+
+    candidates = [
+        persona for persona in PERSONA_LIBRARY if persona["country"].lower() == country.lower()
+    ] or PERSONA_LIBRARY
+
+    def persona_distance(persona: Dict[str, Any]) -> int:
+        if age is None:
+            return 0
+        return abs(persona["age"] - age)
+
+    persona = min(candidates, key=persona_distance)
+    age_guidance = _age_guidance(age)
+    return {
+        "persona_name": persona["name"],
+        "persona_country": persona["country"],
+        "persona_age": persona["age"],
+        "patient_age": age,
+        "patient_country": country or None,
+        "life_stage": persona["life_stage"],
+        "digital_fluency": persona["digital_fluency"],
+        "main_motivation": persona["main_motivation"],
+        "main_fear": persona["main_fear"],
+        "tone": persona["tone"],
+        "signal_limit": _digital_signal_limit(persona["digital_fluency"]),
+        "age_frame": age_guidance["frame"],
+        "next_step_style": age_guidance["next_step_style"],
+    }
+
+
+def _is_low_complexity_persona(persona_context: Dict[str, Any] | None) -> bool:
+    if not persona_context:
+        return False
+    digital = str(persona_context.get("digital_fluency") or "").lower()
+    age = _as_int(persona_context.get("patient_age"))
+    return "low" in digital or bool(age and age >= 70)
+
+
+def followup_examples_line(persona_context: Dict[str, Any] | None) -> str:
+    if not persona_context:
+        return _pick(
+            [
+                "You can ask how sleep compares to stress, what 'weakest pillar' means for you, or for one concrete habit to try this week.",
+                "Ask about energy and recovery, cardiometabolic prevention, or what to ignore for now — I can route those.",
+            ]
+        )
+
+    if _is_low_complexity_persona(persona_context):
+        return _pick(
+            [
+                "You can ask what matters most this week, what you can safely leave on maintenance, or what one manageable next step would help most.",
+                "Ask me which area needs attention first, which one is doing well enough already, or what simple habit would be worth trying.",
+            ]
+        )
+
+    digital = str(persona_context.get("digital_fluency") or "").lower()
+    if "high" in digital:
+        return _pick(
+            [
+                "Ask me to compare two pillars, explain the evidence behind the score, or suggest the highest-leverage experiment for the week.",
+                "You can ask for a sharper trade-off, the strongest supporting signals, or the one change most likely to move the trend.",
+            ]
+        )
+
+    return _pick(
+        [
+            "You can ask which pillar deserves focus first, where you're relatively protected, or what one realistic habit would help this week.",
+            "Ask me to compare your strongest and weakest pillars, explain the trend in plain language, or narrow this to one practical next move.",
+        ]
+    )
+
+
+def next_step_frame(persona_context: Dict[str, Any] | None) -> str:
+    if not persona_context:
+        return "Keep the next move practical and realistic."
+
+    age = _as_int(persona_context.get("patient_age"))
+    if age is None:
+        return "Keep the next move practical and realistic."
+    if age >= 70:
+        return "Keep the next move simple enough to feel manageable."
+    if age >= 60:
+        return "Keep the next move clear, trustworthy, and obviously useful."
+    if age >= 45:
+        return "Keep the next move high-return and respectful of your time."
+    if age >= 35:
+        return "Keep the next move sustainable rather than intense."
+    return "Keep the next move light, repeatable, and easy to learn from."
+
 
 def humanize_metric_key(key: str) -> str:
     k = key.replace("_", " ").strip()
@@ -19,10 +254,16 @@ def humanize_metric_key(key: str) -> str:
     return k
 
 
-def format_signals_for_coach(signals: Dict[str, Any], max_items: int = 5) -> str:
+def format_signals_for_coach(
+    signals: Dict[str, Any],
+    max_items: int = 5,
+    persona_context: Dict[str, Any] | None = None,
+) -> str:
     """Turn key_signals into short spoken-style clauses (not a raw dict repr)."""
     if not signals:
         return "the usual profile and wearable-style inputs we have on file"
+    if persona_context:
+        max_items = min(max_items, int(persona_context.get("signal_limit", max_items)))
     parts: List[str] = []
     for key, val in list(signals.items())[:max_items]:
         label = humanize_metric_key(key)
@@ -68,19 +309,59 @@ def trend_phrase(trend: str) -> str:
     return m.get(trend, trend)
 
 
+def persona_alignment_line(
+    persona_context: Dict[str, Any] | None,
+    focus_name: str,
+    *,
+    strongest_name: str | None = None,
+) -> str:
+    if not persona_context:
+        return f"For someone in your position, {focus_name} is where the next decision has the most leverage."
+
+    motivation = persona_context["main_motivation"]
+    fear = persona_context["main_fear"]
+    frame = persona_context["age_frame"]
+    if strongest_name:
+        return _pick(
+            [
+                f"Given your stage of life, the aim is to {frame}; that makes {focus_name} the place to work, while {strongest_name} can stay on maintenance.",
+                f"If the real goal is to {motivation}, then {focus_name} deserves the energy now — especially because the bigger risk is {fear}.",
+            ]
+        )
+    return _pick(
+        [
+            f"For someone in your stage of life, the point is to {frame}, not to chase perfect scores.",
+            f"If the real goal is to {motivation}, then this answer should help you move without feeding the fear of {fear}.",
+        ]
+    )
+
+
+def persona_style_line(persona_context: Dict[str, Any] | None) -> str:
+    if not persona_context:
+        return "I'll keep this practical and grounded in the data we have."
+    return _pick(
+        [
+            f"I'm answering with your situation in mind: the goal is to {persona_context['main_motivation']}.",
+            f"I'll keep this {persona_context['tone']} because the point is to {persona_context['main_motivation']}, not to add more health noise.",
+        ]
+    )
+
+
 def compose_priority_sections(
     intent: str,
     weakest: Dict[str, Any],
     strongest: Dict[str, Any],
     next_weakest: Dict[str, Any],
+    persona_context: Dict[str, Any] | None = None,
 ) -> List[str]:
     wn, ws = weakest["name"], weakest["score"]
     wtrend = trend_phrase(weakest["trend"])
-    wsig = format_signals_for_coach(weakest.get("key_signals") or {})
+    wsig = format_signals_for_coach(weakest.get("key_signals") or {}, persona_context=persona_context)
     sn, ss = strongest["name"], strongest["score"]
     strend = trend_phrase(strongest["trend"])
-    ssig = format_signals_for_coach(strongest.get("key_signals") or {})
+    ssig = format_signals_for_coach(strongest.get("key_signals") or {}, persona_context=persona_context)
     nn = next_weakest["name"]
+    style = persona_style_line(persona_context)
 
     if intent == "weakness":
         lead = _pick(
@@ -102,7 +383,7 @@ def compose_priority_sections(
                 f"Practically: stabilize {wn} first — then {nn} — while keeping your stronger areas on maintenance.",
             ]
         )
-        return [lead, body, close]
+        return [lead, style, body, persona_alignment_line(persona_context, wn, strongest_name=sn), close]
 
     if intent == "strength":
         lead = _pick(
@@ -124,7 +405,7 @@ def compose_priority_sections(
                 "I'd avoid over-optimizing here; celebrate it and redirect discipline to the weaker pillar.",
             ]
         )
-        return [lead, body, close]
+        return [lead, style, body, persona_alignment_line(persona_context, wn, strongest_name=sn), close]
 
     if intent == "deprioritize":
         lead = _pick(
@@ -146,7 +427,7 @@ def compose_priority_sections(
                 f"Better ROI on your time: lean into {wn} while {sn} stays on light maintenance.",
             ]
         )
-        return [lead, body, close]
+        return [lead, style, body, persona_alignment_line(persona_context, wn, strongest_name=sn), close]
 
     # priority / default
     lead = _pick(
@@ -169,7 +450,7 @@ def compose_priority_sections(
             f"Less urgent: {sn} at about {ss}. Protect it, but don't let it steal focus from {wn}.",
         ]
     )
-    return [lead, body, close]
+    return [lead, style, body, persona_alignment_line(persona_context, wn, strongest_name=sn), close]
 
 
 def firebase_context_line(summary: str) -> str:
@@ -209,11 +490,15 @@ def safety_footers() -> List[str]:
     ]
 
 
-def compose_pillar_sections(pillar: Dict[str, Any], firebase_summary: str) -> List[str]:
+def compose_pillar_sections(
+    pillar: Dict[str, Any],
+    firebase_summary: str,
+    persona_context: Dict[str, Any] | None = None,
+) -> List[str]:
     name = pillar["name"]
     state, trend, score = pillar["state"], pillar["trend"], pillar["score"]
     expl = pillar.get("explanation") or ""
-    sig = format_signals_for_coach(pillar.get("key_signals") or {})
+    sig = format_signals_for_coach(pillar.get("key_signals") or {}, persona_context=persona_context)
     sources = ", ".join(pillar.get("data_sources") or [])
 
     lead = _pick(
@@ -248,7 +533,7 @@ def compose_pillar_sections(pillar: Dict[str, Any], firebase_summary: str) -> Li
             "Coaching-only context; clinical decisions stay with your doctor.",
         ]
     )
-    return [lead, body, evidence, ctx, unc, safe]
+    return [lead, body, persona_alignment_line(persona_context, name), evidence, ctx, unc, safe]
 
 
 def compose_tailored_sections(payload: Dict[str, Any]) -> List[str]:
@@ -256,6 +541,7 @@ def compose_tailored_sections(payload: Dict[str, Any]) -> List[str]:
     claims = payload.get("claims", [])
     trade_offs = payload.get("trade_offs", [])
     actions = payload.get("next_best_actions", [])
+    persona_context = payload.get("persona_context")
 
     direction = context["overall_direction"]
     avg = context["average_score"]
@@ -269,10 +555,11 @@ def compose_tailored_sections(payload: Dict[str, Any]) -> List[str]:
     )
 
     sections: List[str] = [intro]
+    sections.append(persona_style_line(persona_context))
 
     for claim in claims:
         ev = claim["evidence"][0]
-        sig = format_signals_for_coach(ev.get("key_signals") or {})
+        sig = format_signals_for_coach(ev.get("key_signals") or {}, persona_context=persona_context)
         sections.append(
             _pick(
                 [
@@ -298,8 +585,8 @@ def compose_tailored_sections(payload: Dict[str, Any]) -> List[str]:
         sections.append(
             _pick(
                 [
-                    f"Suggestion: {a['action']} — {a['why']}",
-                    f"You might try: {a['action']}. Rationale: {a['why']}",
+                    f"{next_step_frame(persona_context)} {a['action']} {a['why']}",
+                    f"You might try this next: {a['action']} {a['why']}",
                 ]
             )
         )
@@ -316,27 +603,123 @@ def compose_tailored_sections(payload: Dict[str, Any]) -> List[str]:
     return sections
 
 
-def compose_general_sections(message: str, patient_id: str, focus_evidence: Dict[str, Any]) -> List[str]:
+def compose_offer_recommendation_sections(
+    offer: Dict[str, Any],
+    *,
+    primary_focus: Dict[str, Any] | None = None,
+    persona_context: Dict[str, Any] | None = None,
+    scheduled_label: str | None = None,
+    existing_booking: Dict[str, Any] | None = None,
+) -> List[str]:
+    label = offer.get("offer_label") or "this support option"
+    summary = offer.get("summary") or offer.get("rationale") or "It is the clearest next support step from your current data."
+    why_now = offer.get("why_now") or offer.get("rationale") or "It fits the current pattern in your records."
+    personalization = offer.get("personalization_note") or ""
+    missing_data = offer.get("missing_data") or []
+    focus_name = (primary_focus or {}).get("pillar_name") or label
+
+    sections = [
+        _pick(
+            [
+                f"The support option I'd put first right now is {label}.",
+                f"If you want one concrete support step, I'd point to {label}.",
+            ]
+        ),
+        persona_style_line(persona_context),
+        _pick(
+            [
+                f"{summary} The main reason now is simple: {why_now}",
+                f"Why this one: {summary} More specifically, {why_now}",
+            ]
+        ),
+        persona_alignment_line(persona_context, focus_name),
+    ]
+
+    if personalization:
+        sections.append(personalization)
+
+    if existing_booking:
+        sections.append(
+            f"You already have this booked for {existing_booking.get('scheduled_label') or 'a saved slot'}, so I would treat that as your active next step."
+        )
+    elif scheduled_label:
+        sections.append(
+            f"If you want, I can book the first available demo slot for you automatically: {scheduled_label}. Just say 'book it'."
+        )
+
+    if missing_data:
+        sections.append(
+            _pick(
+                [
+                    f"To make it even sharper, {missing_data[0]}",
+                    f"One thing that would personalize this more: {missing_data[0]}",
+                ]
+            )
+        )
+
+    return sections
+
+
+def compose_offer_booking_sections(
+    offer: Dict[str, Any],
+    booking: Dict[str, Any],
+    *,
+    persona_context: Dict[str, Any] | None = None,
+) -> List[str]:
+    label = offer.get("offer_label") or booking.get("offer_label") or "your support option"
+    scheduled_label = booking.get("scheduled_label") or "the next available slot"
+    first_week = offer.get("first_week") or []
+
+    sections = [
+        _pick(
+            [
+                f"I've booked {label} for {scheduled_label}.",
+                f"{label} is now booked for {scheduled_label}.",
+            ]
+        ),
+        _pick(
+            [
+                "I saved it to your support bookings, so it should show up alongside the other booked next steps.",
+                "That booking is now saved in your support bookings, not just mentioned in chat.",
+            ]
+        ),
+        next_step_frame(persona_context),
+    ]
+
+    if first_week:
+        sections.append(
+            _pick(
+                [
+                    f"Before then, start with this: {first_week[0]}",
+                    f"The best thing to do before that slot is simple: {first_week[0]}",
+                ]
+            )
+        )
+    return sections
+
+
+def compose_general_sections(
+    message: str,
+    patient_id: str,
+    focus_evidence: Dict[str, Any],
+    persona_context: Dict[str, Any] | None = None,
+) -> List[str]:
     pid = focus_evidence.get("pillar_id", "a priority pillar").replace("_", " ")
     sc = focus_evidence.get("score", "?")
     tr = focus_evidence.get("trend", "?")
 
     return [
         opening_ack(message),
+        persona_style_line(persona_context),
         _pick(
             [
-                f"For {patient_id}, the compass is highlighting {pid} (about {sc}, {tr}) as the first place I'd explore in conversation.",
-                f"Right now {patient_id}'s data points hardest at {pid} — score near {sc}, trend {tr}.",
-                f"If we opened your dashboard together, I'd probably start with {pid}: ~{sc}, {tr}.",
+                f"Based on your current data, I'd start with {pid}: about {sc} and {tr}.",
+                f"The part of your compass asking for the most attention right now is {pid}, sitting near {sc} and {tr}.",
+                f"If we opened your dashboard together, I'd probably start with {pid}: roughly {sc} and {tr}.",
             ]
         ),
-        _pick(
-            [
-                "You can ask how sleep compares to stress, what 'weakest pillar' means for you, or for one concrete habit to try this week.",
-                "Try: weakest vs strongest pillar, a plain-language nutrition readout, or where burnout risk shows up in the data.",
-                "Ask about energy and recovery, cardiometabolic prevention, or what to ignore for now — I can route those.",
-            ]
-        ),
+        persona_alignment_line(persona_context, pid),
+        followup_examples_line(persona_context),
         _pick(
             [
                 "I'm coaching from structured records and any Firestore context we synced — not replacing your clinician.",

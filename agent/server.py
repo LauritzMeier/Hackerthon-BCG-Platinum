@@ -16,14 +16,30 @@ from pydantic import BaseModel
 
 from .coach_voice import (
     compose_general_sections,
+    compose_offer_booking_sections,
+    compose_offer_recommendation_sections,
     compose_pillar_sections,
     compose_priority_sections,
     compose_tailored_sections,
     firebase_context_line,
     safety_footers,
 )
-from .firebase_client import get_patient_firebase_context, get_runtime_diagnostics
+from .firebase_client import (
+    create_support_booking,
+    get_patient_firebase_context,
+    get_patient_offer_context,
+    get_runtime_diagnostics,
+    save_agent_offer_state,
+)
 from .main import analyze_six_pillars, build_tailored_explanation, explain_pillar
+from .offer_actions import (
+    booking_confirmation_detected,
+    build_offer_slots,
+    direct_booking_requested,
+    normalize_text,
+    offer_request_detected,
+    select_matching_offer,
+)
 
 app = FastAPI(
     title="Longevity ADK Agent Server",
@@ -227,11 +243,261 @@ def _compose_priority_answer(message: str, analysis: Dict[str, Any]) -> List[str
     next_weakest = ranked[1] if len(ranked) > 1 else ranked[0]
     strongest = max(analysis["pillars"], key=lambda pillar: pillar["score"])
     intent = _extract_priority_intent(message) or "priority"
+    persona_context = analysis.get("persona_context")
 
-    sections = compose_priority_sections(intent, weakest, strongest, next_weakest)
+    sections = compose_priority_sections(
+        intent,
+        weakest,
+        strongest,
+        next_weakest,
+        persona_context=persona_context,
+    )
     sections.append(firebase_context_line(analysis["firebase_context_summary"]))
     sections.extend(safety_footers())
     return sections
+
+
+def _find_booked_offer(offer_context: Dict[str, Any], offer_code: str | None) -> Optional[Dict[str, Any]]:
+    if not offer_code:
+        return None
+    for booking in offer_context.get("support_bookings") or []:
+        if booking.get("offer_code") == offer_code and booking.get("status") == "booked":
+            return booking
+    return None
+
+
+def _find_offer_by_code(offer_context: Dict[str, Any], offer_code: str | None) -> Optional[Dict[str, Any]]:
+    if not offer_code:
+        return None
+    candidates = []
+    if offer_context.get("recommended_offer"):
+        candidates.append(offer_context["recommended_offer"])
+    candidates.extend(offer_context.get("additional_offers") or [])
+    candidates.extend(offer_context.get("catalog_offers") or [])
+    for offer in candidates:
+        if offer.get("offer_code") == offer_code:
+            return offer
+    return None
+
+
+def _serialize_offer_slot(slot: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not slot:
+        return None
+    scheduled_for = slot.get("scheduled_for")
+    if hasattr(scheduled_for, "isoformat"):
+        scheduled_for = scheduled_for.isoformat()
+    return {
+        "scheduled_for": scheduled_for,
+        "label": slot.get("label"),
+    }
+
+
+def _build_offer_response(
+    request: ChatRequest,
+    *,
+    analysis: Dict[str, Any],
+    offer_context: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    message = request.message.strip()
+    if not (offer_request_detected(message) or booking_confirmation_detected(message)):
+        return None
+
+    persona_context = analysis.get("persona_context")
+    primary_focus = offer_context.get("primary_focus") or analysis.get("primary_focus") or {}
+    recommended_offer = offer_context.get("recommended_offer")
+    additional_offers = offer_context.get("additional_offers") or []
+    catalog_offers = offer_context.get("catalog_offers") or []
+    agent_offer_state = offer_context.get("agent_offer_state") or {}
+    normalized_message = normalize_text(message)
+    generic_booking_confirmation = normalized_message in {
+        "book it",
+        "book this",
+        "schedule it",
+        "schedule this",
+        "please book",
+        "go ahead",
+        "lets do it",
+        "let s do it",
+        "sounds good",
+        "that works",
+        "do that",
+        "yes",
+        "yes please",
+        "sure",
+        "ok",
+        "okay",
+    }
+
+    if not any([recommended_offer, additional_offers, catalog_offers]):
+        sections = [
+            "I couldn't find any support offers for this patient yet, so I shouldn't pretend there is something ready to book.",
+            "Once `patient_experiences` and `offer_catalog` are synced, I can recommend the best fit and book it from chat.",
+        ]
+        sections.append(firebase_context_line(analysis.get("firebase_context_summary", "")))
+        sections.extend(safety_footers())
+        return {
+            "patient_id": request.patient_id,
+            "sections": sections,
+            "evidence_index": analysis.get("pillars", []) if analysis.get("ok") else {},
+            "offer_action": {
+                "type": "unavailable",
+            },
+            "source_payload": {
+                **analysis,
+                "offer_context": offer_context,
+            },
+        }
+
+    selected_offer = None
+    if booking_confirmation_detected(message) and agent_offer_state.get("status") == "proposed" and generic_booking_confirmation:
+        selected_offer = _find_offer_by_code(
+            offer_context,
+            agent_offer_state.get("offer_code"),
+        )
+    elif direct_booking_requested(message):
+        selected_offer = select_matching_offer(
+            message,
+            recommended_offer=recommended_offer,
+            additional_offers=additional_offers,
+            catalog_offers=catalog_offers,
+        )
+        if selected_offer is None and agent_offer_state.get("status") == "proposed":
+            selected_offer = _find_offer_by_code(
+                offer_context,
+                agent_offer_state.get("offer_code"),
+            )
+    elif booking_confirmation_detected(message) and agent_offer_state.get("status") == "proposed":
+        selected_offer = _find_offer_by_code(
+            offer_context,
+            agent_offer_state.get("offer_code"),
+        )
+
+    if selected_offer is not None:
+        existing_booking = _find_booked_offer(offer_context, selected_offer.get("offer_code"))
+        if existing_booking:
+            sections = compose_offer_recommendation_sections(
+                selected_offer,
+                primary_focus=primary_focus,
+                persona_context=persona_context,
+                existing_booking=existing_booking,
+            )
+            sections.append(firebase_context_line(analysis.get("firebase_context_summary", "")))
+            sections.extend(safety_footers())
+            return {
+                "patient_id": request.patient_id,
+                "sections": sections,
+                "evidence_index": analysis.get("pillars", []) if analysis.get("ok") else {},
+                "offer_action": {
+                    "type": "already_booked",
+                    "offer": selected_offer,
+                    "booking": existing_booking,
+                },
+                "source_payload": {
+                    **analysis,
+                    "offer_context": offer_context,
+                    "booking": existing_booking,
+                },
+            }
+
+        first_slot = build_offer_slots(selected_offer)[0]
+        booking = create_support_booking(
+            request.patient_id,
+            offer=selected_offer,
+            scheduled_for=first_slot["scheduled_for"],
+            scheduled_label=first_slot["label"],
+        )
+        save_agent_offer_state(
+            request.patient_id,
+            status="booked",
+            offer=selected_offer,
+            booking=booking,
+        )
+        sections = compose_offer_booking_sections(
+            selected_offer,
+            booking,
+            persona_context=persona_context,
+        )
+        sections.append(firebase_context_line(analysis.get("firebase_context_summary", "")))
+        sections.extend(safety_footers())
+        return {
+            "patient_id": request.patient_id,
+            "sections": sections,
+            "evidence_index": analysis.get("pillars", []) if analysis.get("ok") else {},
+            "offer_action": {
+                "type": "booking_created",
+                "offer": selected_offer,
+                "booking": booking,
+            },
+            "booking": booking,
+            "source_payload": {
+                **analysis,
+                "offer_context": offer_context,
+                "booking": booking,
+            },
+        }
+
+    if offer_request_detected(message):
+        selected_offer = select_matching_offer(
+            message,
+            recommended_offer=recommended_offer,
+            additional_offers=additional_offers,
+            catalog_offers=catalog_offers,
+        )
+        if selected_offer is None:
+            return None
+        existing_booking = _find_booked_offer(offer_context, selected_offer.get("offer_code"))
+        first_slot = build_offer_slots(selected_offer)[0] if not existing_booking else None
+        save_agent_offer_state(
+            request.patient_id,
+            status="proposed",
+            offer=selected_offer,
+            booking=existing_booking,
+        )
+        sections = compose_offer_recommendation_sections(
+            selected_offer,
+            primary_focus=primary_focus,
+            persona_context=persona_context,
+            scheduled_label=None if existing_booking else (first_slot or {}).get("label"),
+            existing_booking=existing_booking,
+        )
+        sections.append(firebase_context_line(analysis.get("firebase_context_summary", "")))
+        sections.extend(safety_footers())
+        return {
+            "patient_id": request.patient_id,
+            "sections": sections,
+            "evidence_index": analysis.get("pillars", []) if analysis.get("ok") else {},
+            "offer_action": {
+                "type": "proposal",
+                "offer": selected_offer,
+                "first_slot": _serialize_offer_slot(first_slot),
+                "already_booked": bool(existing_booking),
+            },
+            "source_payload": {
+                **analysis,
+                "offer_context": offer_context,
+            },
+        }
+
+    if booking_confirmation_detected(message):
+        sections = [
+            "I can book that for you, but I need one offer to anchor on first.",
+            "Ask me which support option fits best, or name the visit, lab, or program you want booked.",
+        ]
+        sections.extend(safety_footers())
+        return {
+            "patient_id": request.patient_id,
+            "sections": sections,
+            "evidence_index": analysis.get("pillars", []) if analysis.get("ok") else {},
+            "offer_action": {
+                "type": "booking_needs_offer",
+            },
+            "source_payload": {
+                **analysis,
+                "offer_context": offer_context,
+            },
+        }
+
+    return None
 
 
 def _compose_from_tailored(payload: Dict) -> List[str]:
@@ -247,7 +513,12 @@ def _compose_general_chat(message: str, patient_id: str) -> List[str]:
         ]
 
     focus = analysis["claims"][0]["evidence"][0]
-    return compose_general_sections(message, patient_id, focus)
+    return compose_general_sections(
+        message,
+        patient_id,
+        focus,
+        persona_context=analysis.get("persona_context"),
+    )
 
 
 def _extract_debug_payload(source_payload: Dict[str, Any], request: ChatRequest) -> Dict[str, Any]:
@@ -276,6 +547,36 @@ def _extract_debug_payload(source_payload: Dict[str, Any], request: ChatRequest)
         }
     if source_payload.get("firebase_debug"):
         payload["firebase_diagnostics"] = source_payload["firebase_debug"]
+    if source_payload.get("offer_context"):
+        offer_context = source_payload["offer_context"]
+        payload["offers"] = {
+            "experience_available": offer_context.get("experience_available"),
+            "recommended_offer_code": (offer_context.get("recommended_offer") or {}).get("offer_code"),
+            "additional_offer_codes": [
+                offer.get("offer_code") for offer in (offer_context.get("additional_offers") or [])
+            ],
+            "catalog_offer_count": len(offer_context.get("catalog_offers") or []),
+            "support_booking_count": len(offer_context.get("support_bookings") or []),
+            "agent_offer_state": offer_context.get("agent_offer_state"),
+            "warning": offer_context.get("warning"),
+        }
+    if source_payload.get("offer_action"):
+        payload["offer_action"] = source_payload["offer_action"]
+    if source_payload.get("booking"):
+        payload["booking"] = source_payload["booking"]
+    if source_payload.get("persona_context"):
+        persona_context = source_payload["persona_context"]
+        payload["persona"] = {
+            "matched_persona": persona_context.get("persona_name"),
+            "patient_age": persona_context.get("patient_age"),
+            "patient_country": persona_context.get("patient_country"),
+            "life_stage": persona_context.get("life_stage"),
+            "digital_fluency": persona_context.get("digital_fluency"),
+            "main_motivation": persona_context.get("main_motivation"),
+            "main_fear": persona_context.get("main_fear"),
+        }
+    if source_payload.get("patient_profile"):
+        payload["patient_profile"] = source_payload["patient_profile"]
     payload["runtime"] = get_runtime_diagnostics()
     return payload
 
@@ -303,6 +604,31 @@ def _build_chat_sections(request: ChatRequest) -> Dict[str, object]:
         raise HTTPException(status_code=400, detail="message is required")
 
     source_payload: Dict[str, Any] = {}
+    if offer_request_detected(message) or booking_confirmation_detected(message):
+        analysis = analyze_six_pillars(patient_id)
+        offer_context = get_patient_offer_context(patient_id)
+        offer_payload = _build_offer_response(
+            request,
+            analysis=analysis,
+            offer_context=offer_context,
+        )
+        if offer_payload is not None:
+            source_payload = offer_payload.get("source_payload") or {}
+            debug_payload = _extract_debug_payload(source_payload, request) if _chat_debug_enabled(request) else None
+            sections = list(offer_payload["sections"])
+            if debug_payload:
+                debug_section = _build_debug_section(debug_payload)
+                if debug_section:
+                    sections.append(debug_section)
+            return {
+                "patient_id": patient_id,
+                "sections": sections,
+                "evidence_index": offer_payload.get("evidence_index", {}),
+                "debug": debug_payload,
+                "offer_action": offer_payload.get("offer_action"),
+                "booking": offer_payload.get("booking"),
+            }
+
     priority_intent = _extract_priority_intent(message)
     if priority_intent and _extract_target_pillar(message) is None:
         analysis = analyze_six_pillars(patient_id)
@@ -317,7 +643,11 @@ def _build_chat_sections(request: ChatRequest) -> Dict[str, object]:
                 raise HTTPException(status_code=404, detail=pillar_payload.get("error", "analysis failed"))
             pillar = pillar_payload["pillar"]
             source_payload = pillar_payload
-            sections = compose_pillar_sections(pillar, pillar_payload["firebase_context_summary"])
+            sections = compose_pillar_sections(
+                pillar,
+                pillar_payload["firebase_context_summary"],
+                persona_context=pillar_payload.get("persona_context"),
+            )
             evidence_index = {pillar["id"]: pillar}
         else:
             tailored = build_tailored_explanation(patient_id)
@@ -343,6 +673,8 @@ def _build_chat_sections(request: ChatRequest) -> Dict[str, object]:
         "sections": sections,
         "evidence_index": evidence_index,
         "debug": debug_payload,
+        "offer_action": None,
+        "booking": None,
     }
 
 
@@ -370,6 +702,10 @@ async def _sse_stream(
         final_payload["evidence_index"] = chat_payload["evidence_index"]
     if include_debug and chat_payload.get("debug") is not None:
         final_payload["debug"] = chat_payload["debug"]
+    if chat_payload.get("offer_action") is not None:
+        final_payload["offer_action"] = chat_payload["offer_action"]
+    if chat_payload.get("booking") is not None:
+        final_payload["booking"] = chat_payload["booking"]
 
     yield f"event: done\ndata: {json.dumps(final_payload)}\n\n"
 
@@ -427,6 +763,10 @@ def chat_once(request: ChatRequest):
     }
     if request.include_evidence_index:
         response["evidence_index"] = chat_payload["evidence_index"]
+    if chat_payload.get("offer_action") is not None:
+        response["offer_action"] = chat_payload["offer_action"]
+    if chat_payload.get("booking") is not None:
+        response["booking"] = chat_payload["booking"]
     if _chat_debug_enabled(request) and chat_payload.get("debug") is not None:
         response["debug"] = chat_payload["debug"]
     return JSONResponse(content=response)

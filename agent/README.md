@@ -16,6 +16,10 @@ The agent exposes tools for:
   - trade-offs
   - next-best actions
   - required safety guardrails and uncertainty language
+- reading patient-tailored support offers from Firestore
+- matching support offers to chat requests using `patient_experiences` and `offer_catalog`
+- remembering the last proposed offer so a later "book it" can be resolved
+- creating `support_bookings` records with the same shape the Flutter UI reads
 
 The six pillars are:
 
@@ -31,6 +35,11 @@ Analysis combines:
 - curated warehouse fields aligned to [sql/schema_reference.sql](/home/tengen/Code/Hackerthon-BCG-Platinum/sql/schema_reference.sql)
 - especially `curated.patient_profile`, `curated.patient_metrics`, and `curated.coach_context`
 - Firestore patient documents (if present) from the overview-driven agent collections
+- support offer data from Firestore collections:
+  - `patient_experiences`
+  - `offer_catalog`
+  - `coach_conversations`
+  - `support_bookings`
 
 ## Lazy-seed Firestore for the agent
 

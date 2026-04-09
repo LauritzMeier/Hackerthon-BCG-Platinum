@@ -29,6 +29,11 @@ LEGACY_COLLECTIONS = [
     "care_plans",
 ]
 
+PATIENT_EXPERIENCE_COLLECTION = "patient_experiences"
+OFFER_CATALOG_COLLECTION = "offer_catalog"
+SUPPORT_BOOKINGS_COLLECTION = "support_bookings"
+COACH_CONVERSATIONS_COLLECTION = "coach_conversations"
+
 
 def _flag_enabled(*names: str) -> bool:
     return any(os.getenv(name, "").lower() in {"1", "true", "yes", "on"} for name in names)
@@ -160,6 +165,33 @@ def push_test_message(message: str) -> Dict[str, Any]:
     }
 
 
+def _normalize_firestore_value(value: Any) -> Any:
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc).isoformat()
+        return value.astimezone(timezone.utc).isoformat()
+    if isinstance(value, list):
+        return [_normalize_firestore_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [_normalize_firestore_value(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            str(key): _normalize_firestore_value(field_value)
+            for key, field_value in value.items()
+        }
+    return value
+
+
+def _snapshot_data(snapshot: Any) -> Dict[str, Any]:
+    if not snapshot.exists:
+        return {}
+    return _normalize_firestore_value(snapshot.to_dict() or {})
+
+
+def _conversation_ref(client: firestore.Client, patient_id: str):
+    return client.collection(COACH_CONVERSATIONS_COLLECTION).document(patient_id)
+
+
 def _normalize_overview_context(data: Dict[str, Any]) -> Dict[str, Any]:
     overview = data.get("longevity_data_overview") or {}
     pillar_mappings = data.get("pillar_mappings") or {}
@@ -286,6 +318,283 @@ def get_patient_firebase_context(patient_id: str) -> Dict[str, Any]:
     elif _is_debug_enabled():
         response["diagnostics"] = {"runtime": get_runtime_diagnostics()}
     return response
+
+
+def _merge_offer_document(
+    offer: Dict[str, Any],
+    catalog_offer: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    merged = dict(catalog_offer or {})
+    merged.update({
+        key: value for key, value in offer.items() if value not in (None, "", [])
+    })
+    return merged
+
+
+def get_patient_offer_context(patient_id: str) -> Dict[str, Any]:
+    """Load patient-tailored offers, global catalog entries, bookings, and last offer state."""
+    diagnostics: Dict[str, Any] = {
+        "runtime": get_runtime_diagnostics(),
+        "reads": [],
+    }
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:  # pylint: disable=broad-except
+        response = {
+            "ok": False,
+            "patient_id": patient_id,
+            "warning": _firebase_unavailable_reason(exc),
+            "recommended_offer": None,
+            "additional_offers": [],
+            "catalog_offers": [],
+            "support_bookings": [],
+            "agent_offer_state": {},
+        }
+        if _is_firestore_debug_enabled():
+            diagnostics["failure"] = _exception_details(exc, stage="offer_context_client_init")
+            response["diagnostics"] = diagnostics
+        return response
+
+    warning: Optional[str] = None
+    experience_data: Dict[str, Any] = {}
+    catalog_offers: List[Dict[str, Any]] = []
+    bookings: List[Dict[str, Any]] = []
+    agent_offer_state: Dict[str, Any] = {}
+
+    try:
+        experience_snapshot = client.collection(PATIENT_EXPERIENCE_COLLECTION).document(patient_id).get()
+        experience_data = _snapshot_data(experience_snapshot)
+        if _is_firestore_debug_enabled():
+            diagnostics["reads"].append({
+                "collection": PATIENT_EXPERIENCE_COLLECTION,
+                "exists": experience_snapshot.exists,
+            })
+    except Exception as exc:  # pylint: disable=broad-except
+        warning = f"{type(exc).__name__}: {exc}"
+        if _is_firestore_debug_enabled():
+            diagnostics["failure"] = _exception_details(
+                exc,
+                stage="offer_context_patient_experience",
+                collection=PATIENT_EXPERIENCE_COLLECTION,
+            )
+
+    try:
+        catalog_snapshots = list(client.collection(OFFER_CATALOG_COLLECTION).stream())
+        catalog_offers = [
+            _snapshot_data(snapshot)
+            for snapshot in catalog_snapshots
+            if snapshot.exists
+        ]
+        catalog_offers.sort(
+            key=lambda offer: (
+                int(offer.get("sort_order") or 999),
+                str(offer.get("offer_label") or ""),
+            )
+        )
+        if _is_firestore_debug_enabled():
+            diagnostics["reads"].append({
+                "collection": OFFER_CATALOG_COLLECTION,
+                "document_count": len(catalog_offers),
+            })
+    except Exception as exc:  # pylint: disable=broad-except
+        warning = warning or f"{type(exc).__name__}: {exc}"
+        if _is_firestore_debug_enabled():
+            diagnostics["failure"] = _exception_details(
+                exc,
+                stage="offer_context_catalog",
+                collection=OFFER_CATALOG_COLLECTION,
+            )
+
+    try:
+        booking_snapshots = list(
+            client.collection(SUPPORT_BOOKINGS_COLLECTION)
+            .where("patient_id", "==", patient_id)
+            .stream()
+        )
+        bookings = [
+            {
+                **_snapshot_data(snapshot),
+                "booking_id": snapshot.id,
+            }
+            for snapshot in booking_snapshots
+            if snapshot.exists
+        ]
+        bookings.sort(
+            key=lambda booking: (
+                booking.get("scheduled_for") or "9999-99-99T99:99:99+00:00",
+                booking.get("offer_label") or "",
+            )
+        )
+        if _is_firestore_debug_enabled():
+            diagnostics["reads"].append({
+                "collection": SUPPORT_BOOKINGS_COLLECTION,
+                "document_count": len(bookings),
+            })
+    except Exception as exc:  # pylint: disable=broad-except
+        warning = warning or f"{type(exc).__name__}: {exc}"
+        if _is_firestore_debug_enabled():
+            diagnostics["failure"] = _exception_details(
+                exc,
+                stage="offer_context_bookings",
+                collection=SUPPORT_BOOKINGS_COLLECTION,
+            )
+
+    try:
+        conversation_snapshot = _conversation_ref(client, patient_id).get()
+        conversation_data = _snapshot_data(conversation_snapshot)
+        agent_offer_state = conversation_data.get("agent_offer_state") or {}
+        if _is_firestore_debug_enabled():
+            diagnostics["reads"].append({
+                "collection": COACH_CONVERSATIONS_COLLECTION,
+                "exists": conversation_snapshot.exists,
+                "has_agent_offer_state": bool(agent_offer_state),
+            })
+    except Exception as exc:  # pylint: disable=broad-except
+        warning = warning or f"{type(exc).__name__}: {exc}"
+        if _is_firestore_debug_enabled():
+            diagnostics["failure"] = _exception_details(
+                exc,
+                stage="offer_context_conversation",
+                collection=COACH_CONVERSATIONS_COLLECTION,
+            )
+
+    catalog_map = {
+        str(offer.get("offer_code") or ""): offer
+        for offer in catalog_offers
+        if offer.get("offer_code")
+    }
+    offers_block = experience_data.get("offers") or {}
+    recommended_offer = offers_block.get("recommended")
+    if isinstance(recommended_offer, dict):
+        recommended_offer = _merge_offer_document(
+            recommended_offer,
+            catalog_map.get(str(recommended_offer.get("offer_code") or "")),
+        )
+    else:
+        recommended_offer = None
+
+    additional_offers_raw = offers_block.get("additional_items") or []
+    additional_offers = [
+        _merge_offer_document(
+            item,
+            catalog_map.get(str(item.get("offer_code") or "")),
+        )
+        for item in additional_offers_raw
+        if isinstance(item, dict)
+    ]
+
+    response = {
+        "ok": True,
+        "patient_id": patient_id,
+        "warning": warning,
+        "recommended_offer": recommended_offer,
+        "additional_offers": additional_offers,
+        "catalog_offers": catalog_offers,
+        "support_bookings": bookings,
+        "agent_offer_state": agent_offer_state,
+        "primary_focus": ((experience_data.get("compass") or {}).get("primary_focus") or {}),
+        "experience_available": bool(experience_data),
+    }
+    if _is_firestore_debug_enabled():
+        response["diagnostics"] = diagnostics
+    return response
+
+
+def save_agent_offer_state(
+    patient_id: str,
+    *,
+    status: str,
+    offer: Optional[Dict[str, Any]] = None,
+    booking: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Persist lightweight agent offer state under the existing conversation doc."""
+    client = get_firestore_client()
+    payload: Dict[str, Any] = {
+        "patient_id": patient_id,
+        "source": "longevity_agent_service",
+        "last_updated_at": firestore.SERVER_TIMESTAMP,
+        "agent_offer_state": {
+            "status": status,
+            "updated_at": firestore.SERVER_TIMESTAMP,
+        },
+    }
+    if offer:
+        payload["agent_offer_state"].update({
+            "offer_code": offer.get("offer_code"),
+            "offer_label": offer.get("offer_label"),
+            "offer_type": offer.get("offer_type"),
+            "delivery_model": offer.get("delivery_model"),
+        })
+    if booking:
+        payload["agent_offer_state"].update({
+            "booking_id": booking.get("booking_id"),
+            "scheduled_label": booking.get("scheduled_label"),
+        })
+
+    _conversation_ref(client, patient_id).set(payload, merge=True)
+    return {
+        "status": status,
+        "offer_code": (offer or {}).get("offer_code"),
+        "offer_label": (offer or {}).get("offer_label"),
+        "booking_id": (booking or {}).get("booking_id"),
+        "scheduled_label": (booking or {}).get("scheduled_label"),
+    }
+
+
+def create_support_booking(
+    patient_id: str,
+    *,
+    offer: Dict[str, Any],
+    scheduled_for: datetime,
+    scheduled_label: str,
+) -> Dict[str, Any]:
+    """Create a support booking using the same document shape as the Flutter UI."""
+    client = get_firestore_client()
+    offer_code = str(offer.get("offer_code") or "")
+    if not offer_code:
+        raise ValueError("offer_code is required to create a support booking")
+
+    existing_snapshots = list(
+        client.collection(SUPPORT_BOOKINGS_COLLECTION)
+        .where("patient_id", "==", patient_id)
+        .stream()
+    )
+    for existing in existing_snapshots:
+        if not existing.exists:
+            continue
+        data = _snapshot_data(existing)
+        if data.get("offer_code") == offer_code and data.get("status") == "booked":
+            data["booking_id"] = existing.id
+            data["already_booked"] = True
+            return data
+
+    if scheduled_for.tzinfo is None:
+        scheduled_for = scheduled_for.replace(tzinfo=timezone.utc)
+    else:
+        scheduled_for = scheduled_for.astimezone(timezone.utc)
+
+    payload = {
+        "patient_id": patient_id,
+        "offer_code": offer_code,
+        "offer_label": offer.get("offer_label"),
+        "offer_type": offer.get("offer_type"),
+        "delivery_model": offer.get("delivery_model"),
+        "status": "booked",
+        "scheduled_for": scheduled_for,
+        "scheduled_label": scheduled_label,
+        "source": "longevity_agent_service",
+        "booked_via": "agent_chat",
+        "created_at": firestore.SERVER_TIMESTAMP,
+    }
+
+    doc_ref = client.collection(SUPPORT_BOOKINGS_COLLECTION).document()
+    doc_ref.set(payload)
+    saved = doc_ref.get()
+    data = _snapshot_data(saved)
+    data["booking_id"] = doc_ref.id
+    data["already_booked"] = False
+    return data
 
 
 def _firebase_unavailable_reason(exc: Exception) -> str:

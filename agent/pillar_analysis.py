@@ -10,6 +10,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any, Dict, List, Optional
 
+from .coach_voice import derive_persona_context
 from .firebase_client import get_patient_firebase_context
 from longevity_mvp.bootstrap import ensure_local_warehouse
 from longevity_mvp.repository import WarehouseRepository
@@ -137,6 +138,25 @@ def _trend_from_delta(delta: float) -> str:
     if delta < -2.0:
         return "drifting"
     return "stable"
+
+
+def _safe_int(value: Any) -> int | None:
+    try:
+        if value in (None, ""):
+            return None
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _patient_profile_summary(profile: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "age": _safe_int(profile.get("age")),
+        "country": profile.get("country"),
+        "sex": profile.get("sex"),
+        "estimated_biological_age": _safe_float(profile.get("estimated_biological_age"), default=None),
+        "primary_focus_area": profile.get("primary_focus_area"),
+    }
 
 
 @lru_cache(maxsize=1)
@@ -355,6 +375,8 @@ def analyze_patient_six_pillars(
         _build_mental(profile),
     ]
     pillars.sort(key=lambda item: PILLARS.index(item["id"]))
+    persona_context = derive_persona_context(profile)
+    patient_profile = _patient_profile_summary(profile)
 
     avg_score = round(mean(p["score"] for p in pillars), 1)
     drifting = sum(1 for p in pillars if p["trend"] == "drifting")
@@ -378,6 +400,8 @@ def analyze_patient_six_pillars(
         "pillars": pillars,
         "firebase_context_summary": firebase_summary,
         "firebase_context": firebase_context,
+        "patient_profile": patient_profile,
+        "persona_context": persona_context,
         "data_sources": [
             "curated.patient_profile",
             "curated.patient_metrics",
@@ -416,6 +440,8 @@ def explain_single_pillar(patient_id: str, pillar_id: str) -> Dict[str, Any]:
         ),
         "firebase_context_summary": analysis["firebase_context_summary"],
         "firebase_context": analysis["firebase_context"],
+        "patient_profile": analysis.get("patient_profile"),
+        "persona_context": analysis.get("persona_context"),
         "firebase_debug": analysis.get("firebase_debug"),
     }
 
@@ -567,6 +593,8 @@ def generate_tailored_explanation(patient_id: str) -> Dict[str, Any]:
         },
         "firebase_context_summary": analysis["firebase_context_summary"],
         "firebase_context": analysis["firebase_context"],
+        "patient_profile": analysis.get("patient_profile"),
+        "persona_context": analysis.get("persona_context"),
         "claims": claims,
         "trade_offs": trade_offs,
         "next_best_actions": next_best_actions,
