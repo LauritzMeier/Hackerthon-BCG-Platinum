@@ -276,9 +276,8 @@ bool _hasReliableBiologicalAgeEstimate(ExperienceSnapshot experience) {
     return false;
   }
 
-  final precisePillars = experience.compass.pillars
-      .where((pillar) => pillar.hasEnoughData)
-      .length;
+  final precisePillars =
+      experience.compass.pillars.where((pillar) => pillar.hasEnoughData).length;
   return precisePillars >= 4;
 }
 
@@ -339,6 +338,9 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
     if (!comparison.hasItems) {
       return const SizedBox.shrink();
     }
+    final hasLimitedPillars = comparison.items.any(
+      (item) => !item.hasEnoughData,
+    );
 
     final selectedComparison = comparison.items.firstWhere(
       (item) => item.pillarId == _selectedPillarId,
@@ -383,30 +385,32 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
                 background: AppPalette.ink.withValues(alpha: 0.08),
                 foreground: AppPalette.ink,
               ),
-              if (comparison.sampleSize > 0)
+              if (hasLimitedPillars)
                 _MiniBadge(
-                  label: '${comparison.sampleSize} peers',
-                  background: AppPalette.mint.withValues(alpha: 0.9),
+                  label: 'Unknown pillars stay unscored',
+                  background: AppPalette.sand.withValues(alpha: 0.92),
                   foreground: AppPalette.ink,
                 ),
             ],
           ),
           const SizedBox(height: 16),
           Text(
-            comparison.headline,
+            _radarHeadline(comparison),
             style: theme.textTheme.headlineSmall?.copyWith(
               color: AppPalette.ink,
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            comparison.cohortLabel,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: AppPalette.ink.withValues(alpha: 0.72),
-              height: 1.4,
+          if (_radarSubtitle(comparison).isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              _radarSubtitle(comparison),
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: AppPalette.ink.withValues(alpha: 0.72),
+                height: 1.4,
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 18),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -439,7 +443,7 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
                       _MiniBadge(
                         label: selectedComparison.hasEnoughData
                             ? differenceAppearance.label
-                            : 'Needs more data',
+                            : 'Not scored yet',
                         background: differenceAppearance.background,
                         foreground: differenceAppearance.foreground,
                       ),
@@ -467,20 +471,36 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      _ComparisonStatTile(
-                        label: 'You',
-                        value: selectedComparison.patientScoreLabel,
-                      ),
-                      _ComparisonStatTile(
-                        label: 'Age cohort',
-                        value: selectedComparison.peerScoreLabel,
-                      ),
-                    ],
-                  ),
+                  if (selectedComparison.hasEnoughData)
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        _ComparisonStatTile(
+                          label: 'You',
+                          value: selectedComparison.patientScoreLabel,
+                        ),
+                        _ComparisonStatTile(
+                          label: 'Age group',
+                          value: selectedComparison.peerScoreLabel,
+                        ),
+                      ],
+                    )
+                  else
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        const _ComparisonStatTile(
+                          label: 'You',
+                          value: '?',
+                        ),
+                        _ComparisonStatTile(
+                          label: 'Age group',
+                          value: selectedComparison.peerScoreLabel,
+                        ),
+                      ],
+                    ),
                   const SizedBox(height: 16),
                   Wrap(
                     spacing: 8,
@@ -514,7 +534,9 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Tap any pillar around the chart to drill into the comparison.',
+                    selectedComparison.hasEnoughData
+                        ? 'Tap any pillar around the chart to drill into the comparison.'
+                        : 'Tap any pillar to see whether it is already scored or still waiting for data.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppPalette.ink.withValues(alpha: 0.56),
                       fontWeight: FontWeight.w700,
@@ -660,7 +682,9 @@ class _CompassRadarDiagram extends StatelessWidget {
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          item.patientScoreLabel,
+                                          item.hasEnoughData
+                                              ? item.patientScoreLabel
+                                              : '?',
                                           style: Theme.of(context)
                                               .textTheme
                                               .titleMedium
@@ -763,23 +787,39 @@ class _CompassRadarPainter extends CustomPainter {
       items: items,
       scoreSelector: (item) => item.patientScore,
     );
-    canvas.drawPath(
-      patientPath,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            AppPalette.forest.withValues(alpha: 0.34),
-            AppPalette.moss.withValues(alpha: 0.12),
-          ],
-        ).createShader(Offset.zero & size),
-    );
-    canvas.drawPath(
-      patientPath,
-      Paint()
-        ..color = AppPalette.forest
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3,
-    );
+    final hasFullComparisonData = items.every((item) => item.hasEnoughData);
+
+    if (hasFullComparisonData) {
+      canvas.drawPath(
+        patientPath,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              AppPalette.forest.withValues(alpha: 0.34),
+              AppPalette.moss.withValues(alpha: 0.12),
+            ],
+          ).createShader(Offset.zero & size),
+      );
+      canvas.drawPath(
+        patientPath,
+        Paint()
+          ..color = AppPalette.forest
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3,
+      );
+    } else {
+      _drawSegmentedSeries(
+        canvas,
+        center: center,
+        radius: radius,
+        items: items,
+        scoreSelector: (item) => item.patientScore,
+        strokePaint: Paint()
+          ..color = AppPalette.forest
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3,
+      );
+    }
 
     for (var index = 0; index < items.length; index++) {
       final item = items[index];
@@ -804,6 +844,9 @@ class _CompassRadarPainter extends CustomPainter {
         selected ? 4.5 : 3.5,
         Paint()..color = AppPalette.ink.withValues(alpha: 0.32),
       );
+      if (!item.hasEnoughData) {
+        continue;
+      }
       canvas.drawCircle(
         patientPoint,
         selected ? 7 : 5,
@@ -814,6 +857,54 @@ class _CompassRadarPainter extends CustomPainter {
         selected ? 12 : 8,
         Paint()..color = accent.withValues(alpha: 0.14),
       );
+    }
+  }
+
+  void _drawSegmentedSeries(
+    Canvas canvas, {
+    required Offset center,
+    required double radius,
+    required List<PeerComparisonItem> items,
+    required double Function(PeerComparisonItem item) scoreSelector,
+    required Paint strokePaint,
+  }) {
+    for (var index = 0; index < items.length; index++) {
+      final item = items[index];
+      if (!item.hasEnoughData) {
+        continue;
+      }
+
+      final nextIndex = (index + 1) % items.length;
+      final nextItem = items[nextIndex];
+      if (!nextItem.hasEnoughData) {
+        continue;
+      }
+
+      final startAngle =
+          (-math.pi / 2) + ((2 * math.pi * index) / items.length);
+      final endAngle =
+          (-math.pi / 2) + ((2 * math.pi * nextIndex) / items.length);
+      final startPoint = Offset(
+        center.dx +
+            math.cos(startAngle) *
+                radius *
+                _normalizedScore(scoreSelector(item)),
+        center.dy +
+            math.sin(startAngle) *
+                radius *
+                _normalizedScore(scoreSelector(item)),
+      );
+      final endPoint = Offset(
+        center.dx +
+            math.cos(endAngle) *
+                radius *
+                _normalizedScore(scoreSelector(nextItem)),
+        center.dy +
+            math.sin(endAngle) *
+                radius *
+                _normalizedScore(scoreSelector(nextItem)),
+      );
+      canvas.drawLine(startPoint, endPoint, strokePaint);
     }
   }
 
@@ -1410,10 +1501,9 @@ class _OfferDetailSheet extends StatelessWidget {
                         runSpacing: 8,
                         children: [
                           _MiniBadge(
-                            label:
-                                highlight
-                                    ? 'Best next step'
-                                    : practical.categoryLabel,
+                            label: highlight
+                                ? 'Best next step'
+                                : practical.categoryLabel,
                             background: AppPalette.mint.withValues(alpha: 0.85),
                             foreground: AppPalette.ink,
                           ),
@@ -1819,7 +1909,8 @@ List<_OfferSlotOption> _buildOfferSlots(OfferOpportunity offer) {
       days == offsets.first ? 0 : 30,
     );
     return _OfferSlotOption(
-      label: '${formatter.format(scheduledFor)} • ${practical.locationShortLabel}',
+      label:
+          '${formatter.format(scheduledFor)} • ${practical.locationShortLabel}',
       scheduledFor: scheduledFor,
     );
   }).toList(growable: false);
@@ -2043,8 +2134,8 @@ String _comparisonBody(
   PrimaryFocus primaryFocus,
 ) {
   if (!item.hasEnoughData) {
-    return 'This pillar is still being estimated from limited or stale data. '
-        'Track a little more here before treating the score as precise.';
+    return 'Your own score stays unscored here until enough recent tracking is connected. '
+        'The age-group baseline is still shown so you can see where this pillar usually sits.';
   }
 
   final notes = <String>[];
@@ -2068,6 +2159,21 @@ String _comparisonBody(
   }
 
   return notes.join(' ');
+}
+
+String _radarHeadline(PeerComparisonSnapshot comparison) {
+  final hasLimitedPillars = comparison.items.any((item) => !item.hasEnoughData);
+  return hasLimitedPillars
+      ? 'How your tracked pillars compare with your age group'
+      : 'How your six pillars compare with your age group';
+}
+
+String _radarSubtitle(PeerComparisonSnapshot comparison) {
+  final hasLimitedPillars = comparison.items.any((item) => !item.hasEnoughData);
+  if (!hasLimitedPillars) {
+    return '';
+  }
+  return 'Pillars without enough recent data stay blank until they can be scored confidently.';
 }
 
 _BadgeAppearance _appearanceForDataConfidence(String raw) {

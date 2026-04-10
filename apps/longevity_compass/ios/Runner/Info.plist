@@ -24,6 +24,10 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Longevity Compass uses the microphone so you can ask the coach questions by voice.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Longevity Compass uses speech recognition to turn your spoken question into a coach message.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

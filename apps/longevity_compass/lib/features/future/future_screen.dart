@@ -65,15 +65,6 @@ class FutureScreen extends StatelessWidget {
                   ? 'A first visit or baseline test is only worth it if it clarifies what happens next.'
                   : 'These options should help you make a clearer next decision, not just add more stuff.',
             ),
-            if (recommendedOffer != null) ...[
-              const SizedBox(height: 24),
-              SectionSurface(
-                title: 'How to choose',
-                subtitle:
-                    'Pick the option that creates the clearest next decision.',
-                child: _SupportDecisionGuide(offer: recommendedOffer),
-              ),
-            ],
             if (bookedOffers.isNotEmpty) ...[
               const SizedBox(height: 24),
               SectionSurface(
@@ -145,100 +136,6 @@ class FutureScreen extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _SupportDecisionGuide extends StatelessWidget {
-  const _SupportDecisionGuide({required this.offer});
-
-  final OfferOpportunity offer;
-
-  @override
-  Widget build(BuildContext context) {
-    final dataSignals = customerFriendlyOfferEvidence(offer.dataUsed)
-        .take(3)
-        .toList(growable: false);
-    final missingSignals = customerFriendlyMissingData(offer.missingData);
-    final practical = practicalInfoForOffer(offer);
-
-    return Column(
-      children: [
-        _GuidePoint(
-          title: 'Why this one leads',
-          body: offer.whyNow,
-        ),
-        const SizedBox(height: 12),
-        _GuidePoint(
-          title: 'What good looks like',
-          body: offer.expectedOutcome,
-        ),
-        const SizedBox(height: 12),
-        _GuidePoint(
-          title: 'What it is based on',
-          body: dataSignals.isEmpty
-              ? 'This is still a starter recommendation.'
-              : dataSignals.join(' • '),
-        ),
-        const SizedBox(height: 12),
-        _GuidePoint(
-          title: 'Practical details',
-          body:
-              '${practical.priceLabel} • ${practical.locationLabel} • ${practical.clinicianLabel}',
-        ),
-        if (offer.missingData.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _GuidePoint(
-            title: 'What would sharpen it',
-            body: missingSignals.first,
-            accent: AppPalette.sand.withValues(alpha: 0.88),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _GuidePoint extends StatelessWidget {
-  const _GuidePoint({
-    required this.title,
-    required this.body,
-    this.accent,
-  });
-
-  final String title;
-  final String body;
-  final Color? accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: accent ?? Colors.white.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: AppPalette.ink,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            body,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppPalette.ink.withValues(alpha: 0.78),
-                  height: 1.45,
-                ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -21,11 +21,11 @@ class AppConfig {
 
   static const bool enableFirebase = bool.fromEnvironment(
     'APP_ENABLE_FIREBASE',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   static const String firestoreDatabaseId = String.fromEnvironment(
     'APP_FIRESTORE_DATABASE_ID',
-    defaultValue: '(default)',
+    defaultValue: 'longevity-compass-firestore',
   );
 }

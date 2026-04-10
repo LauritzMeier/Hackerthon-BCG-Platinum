@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../app/app_theme.dart';
+import '../../core/models/experience_models.dart';
 import '../../widgets/compass_components.dart';
 import '../dashboard/dashboard_controller.dart';
 
@@ -14,16 +18,136 @@ class CoachScreen extends StatefulWidget {
 
 class _CoachScreenState extends State<CoachScreen> {
   final TextEditingController _textController = TextEditingController();
+  final FocusNode _composerFocusNode = FocusNode();
+  final SpeechToText _speechToText = SpeechToText();
+  bool _speechAvailable = false;
+  bool _isListening = false;
+  String? _voiceStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeSpeech();
+  }
 
   @override
   void dispose() {
+    _speechToText.cancel();
+    _composerFocusNode.dispose();
     _textController.dispose();
     super.dispose();
   }
 
+  Future<void> _initializeSpeech() async {
+    final available = await _speechToText.initialize(
+      onStatus: _handleSpeechStatus,
+      onError: (error) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _isListening = false;
+          _voiceStatus = 'Voice input is not available right now.';
+        });
+      },
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _speechAvailable = available;
+      _voiceStatus = available ? 'Voice input ready.' : null;
+    });
+  }
+
+  void _handleSpeechStatus(String status) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isListening = status == 'listening';
+      if (status == 'listening') {
+        _voiceStatus = 'Listening... say your question.';
+      } else if (status == 'done' || status == 'notListening') {
+        _voiceStatus = 'Voice captured. Review and send.';
+      }
+    });
+  }
+
+  void _handleSpeechResult(SpeechRecognitionResult result) {
+    final spokenText = result.recognizedWords.trim();
+    if (spokenText.isEmpty) {
+      return;
+    }
+
+    _textController.value = TextEditingValue(
+      text: spokenText,
+      selection: TextSelection.collapsed(offset: spokenText.length),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _voiceStatus = result.finalResult
+          ? 'Voice captured. Review and send.'
+          : 'Listening...';
+    });
+  }
+
   Future<void> _send(DashboardController controller, String message) async {
+    final trimmed = message.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
     _textController.clear();
-    await controller.sendCoachMessage(message);
+    if (_isListening) {
+      await _speechToText.stop();
+    }
+    await controller.sendCoachMessage(trimmed);
+  }
+
+  Future<void> _toggleVoice() async {
+    if (!_speechAvailable) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Voice input is not available on this device yet.'),
+        ),
+      );
+      return;
+    }
+
+    if (_isListening) {
+      await _speechToText.stop();
+      return;
+    }
+
+    final didStart = await _speechToText.listen(
+      onResult: _handleSpeechResult,
+      listenOptions: SpeechListenOptions(
+        partialResults: true,
+        cancelOnError: true,
+        listenMode: ListenMode.dictation,
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isListening = didStart;
+      _voiceStatus = didStart
+          ? 'Listening... say your question.'
+          : 'Voice input could not start.';
+    });
   }
 
   @override
@@ -47,12 +171,14 @@ class _CoachScreenState extends State<CoachScreen> {
           );
         }
 
-        final connectedSignals = experience.dataCoverage.connectedSources
-            .take(2)
-            .toList(growable: false);
-        final missingSignals = experience.dataCoverage.missingSources
-            .take(2)
-            .toList(growable: false);
+        final hasUserMessages = controller.chatMessages.any(
+          (message) => message.isUser,
+        );
+        final conversationMessages = controller.chatMessages.isEmpty
+            ? [ChatMessage.assistant(experience.coach.intro)]
+            : controller.chatMessages;
+        final showStarterPrompts =
+            experience.coach.suggestedPrompts.isNotEmpty && !hasUserMessages;
 
         return ListView(
           padding: const EdgeInsets.all(24),
@@ -96,142 +222,175 @@ class _CoachScreenState extends State<CoachScreen> {
                     'The coach should answer from your linked care and device context, not from a blank slate.',
               ),
               const SizedBox(height: 24),
-              SectionSurface(
-                title: 'Answer quality',
-                subtitle:
-                    'This is the evidence the coach can use before answering.',
-                child: Column(
-                  children: [
-                    _CoachStatusCard(
-                      title: controller.usesLiveAgent
-                          ? 'Live coach connected'
-                          : 'Local guidance mode',
-                      body: controller.usesLiveAgent
-                          ? 'New questions in this view go to the real patient-specific agent.'
-                          : 'The coach is using the loaded experience snapshot, not the live agent.',
-                      accent: AppPalette.mint.withValues(alpha: 0.3),
-                    ),
-                    const SizedBox(height: 12),
-                    _CoachStatusCard(
-                      title: 'Using now',
-                      body: connectedSignals.isEmpty
-                          ? 'No strong connected data source is shaping the answer yet.'
-                          : connectedSignals.join(' '),
-                    ),
-                    const SizedBox(height: 12),
-                    _CoachStatusCard(
-                      title: 'Medical context',
-                      body: _firstSentence(
-                        experience.careContext.lastAppointmentSummary,
-                      ),
-                      accent: AppPalette.sand.withValues(alpha: 0.82),
-                    ),
-                    const SizedBox(height: 12),
-                    _CoachStatusCard(
-                      title: 'Still coarse',
-                      body: missingSignals.isEmpty
-                          ? 'No major data gap is blocking a useful answer right now.'
-                          : missingSignals.first,
-                    ),
-                    if (experience.careContext.medicalGuardrail.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      _CoachStatusCard(
-                        title: 'Guardrail',
-                        body: experience.careContext.medicalGuardrail,
-                        accent: AppPalette.sand.withValues(alpha: 0.9),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
             ],
-            const SizedBox(height: 24),
             SectionSurface(
-              title: 'Start with one of these',
-              subtitle: controller.isWelcomeJourney
-                  ? 'Use the prompts to decide what to connect or book first.'
-                  : 'Use the prompts if you want the coach to explain the plan in plain language.',
-              child: Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: experience.coach.suggestedPrompts
-                    .map(
-                      (prompt) => ActionChip(
-                        label: Text(prompt),
-                        onPressed: () => _send(controller, prompt),
-                      ),
-                    )
-                    .toList(growable: false),
-              ),
-            ),
-            const SizedBox(height: 24),
-            SectionSurface(
-              title: 'Chat',
+              title: controller.isWelcomeJourney ? 'Coach chat' : 'Chat',
               subtitle: controller.isWelcomeJourney
                   ? 'Use this to choose the first useful connection or first clinic step.'
                   : 'Use this to clarify the plan, explain a change, or compare support options.',
               child: Column(
                 children: [
-                  if (controller.chatMessages.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppPalette.canvas.withValues(alpha: 0.54),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppPalette.canvas.withValues(alpha: 0.44),
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final message in conversationMessages) ...[
+                          ChatBubble(message: message),
+                          const SizedBox(height: 12),
+                        ],
+                        if (showStarterPrompts) ...[
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: experience.coach.suggestedPrompts
+                                  .map(
+                                    (prompt) => ActionChip(
+                                      label: Text(prompt),
+                                      onPressed: controller.isSendingMessage
+                                          ? null
+                                          : () => _send(controller, prompt),
+                                    ),
+                                  )
+                                  .toList(growable: false),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                        if (controller.isSendingMessage)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.88),
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              child: Text(
+                                'The coach is writing back...',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: AppPalette.ink
+                                          .withValues(alpha: 0.74),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppPalette.sand.withValues(alpha: 0.44),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Focus(
+                            onKeyEvent: (node, event) {
+                              if (event is! KeyDownEvent) {
+                                return KeyEventResult.ignored;
+                              }
+                              final isEnter = event.logicalKey ==
+                                      LogicalKeyboardKey.enter ||
+                                  event.logicalKey ==
+                                      LogicalKeyboardKey.numpadEnter;
+                              if (!isEnter ||
+                                  HardwareKeyboard.instance.isShiftPressed) {
+                                return KeyEventResult.ignored;
+                              }
+                              if (controller.isSendingMessage) {
+                                return KeyEventResult.handled;
+                              }
+                              _send(controller, _textController.text);
+                              return KeyEventResult.handled;
+                            },
+                            child: TextField(
+                              controller: _textController,
+                              focusNode: _composerFocusNode,
+                              enabled: !controller.isSendingMessage,
+                              minLines: 1,
+                              maxLines: 4,
+                              textInputAction: TextInputAction.send,
+                              decoration: InputDecoration(
+                                hintText: controller.isWelcomeJourney
+                                    ? 'Tell the coach what you want help with first.'
+                                    : 'Ask about your plan, your recent appointment, or your next step.',
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                filled: false,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              onSubmitted: (value) => _send(controller, value),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        IconButton(
+                          tooltip: _isListening
+                              ? 'Stop voice input'
+                              : 'Start voice input',
+                          onPressed:
+                              controller.isSendingMessage ? null : _toggleVoice,
+                          icon: Icon(
+                            _isListening
+                                ? Icons.stop_circle_outlined
+                                : Icons.mic_none_rounded,
+                          ),
+                          style: IconButton.styleFrom(
+                            backgroundColor: _isListening
+                                ? AppPalette.forest
+                                : Colors.white.withValues(alpha: 0.82),
+                            foregroundColor:
+                                _isListening ? Colors.white : AppPalette.ink,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: controller.isSendingMessage
+                              ? null
+                              : () => _send(controller, _textController.text),
+                          child: const Text('Send'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_voiceStatus != null) ...[
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
                       child: Text(
-                        controller.isWelcomeJourney
-                            ? 'No messages yet. Start by telling the coach what you want help with first.'
-                            : 'No messages yet in this session. Ask a fresh question and the coach should answer from this patient context.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppPalette.ink.withValues(alpha: 0.78),
-                              height: 1.4,
+                        _voiceStatus!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppPalette.ink.withValues(alpha: 0.64),
+                              fontWeight: FontWeight.w700,
                             ),
                       ),
                     ),
-                  if (controller.chatMessages.isEmpty)
-                    const SizedBox(height: 12),
-                  for (final message in controller.chatMessages) ...[
-                    ChatBubble(message: message),
-                    const SizedBox(height: 12),
                   ],
-                  if (controller.isSendingMessage)
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: CircularProgressIndicator(),
-                      ),
-                    ),
                 ],
               ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _textController,
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      hintText: controller.isWelcomeJourney
-                          ? 'Tell the coach the outcome you want, what you can connect, or what feels most important first.'
-                          : 'Tell the coach what happened, what your doctor said, or what feels unclear.',
-                    ),
-                    onSubmitted: (value) => _send(controller, value),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                FilledButton(
-                  onPressed: controller.isSendingMessage
-                      ? null
-                      : () => _send(controller, _textController.text),
-                  child: const Text('Send'),
-                ),
-              ],
             ),
           ],
         );
@@ -291,58 +450,4 @@ class _CoachInfoList extends StatelessWidget {
       ],
     );
   }
-}
-
-class _CoachStatusCard extends StatelessWidget {
-  const _CoachStatusCard({
-    required this.title,
-    required this.body,
-    this.accent,
-  });
-
-  final String title;
-  final String body;
-  final Color? accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: accent ?? Colors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppPalette.ink,
-                ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            body,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppPalette.ink.withValues(alpha: 0.8),
-                  height: 1.45,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-String _firstSentence(String value) {
-  final trimmed = value.trim();
-  if (trimmed.isEmpty) {
-    return '';
-  }
-
-  final match = RegExp(r'^.*?[.!?](?:\s|$)').firstMatch(trimmed);
-  return match == null ? trimmed : match.group(0)!.trim();
 }

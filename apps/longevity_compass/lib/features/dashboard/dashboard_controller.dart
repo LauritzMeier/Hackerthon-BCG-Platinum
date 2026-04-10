@@ -75,10 +75,11 @@ class DashboardController extends ChangeNotifier {
       return;
     }
 
-    chatMessages = <ChatMessage>[
-      ...chatMessages,
-      ChatMessage.user(trimmed),
-    ];
+    final baseMessages = _withoutTransientWelcomeIntro(
+      messages: chatMessages,
+      experience: currentExperience,
+    );
+    chatMessages = <ChatMessage>[...baseMessages, ChatMessage.user(trimmed)];
     isSendingMessage = true;
     errorMessage = null;
     notifyListeners();
@@ -123,6 +124,25 @@ class DashboardController extends ChangeNotifier {
       isSendingMessage = false;
       notifyListeners();
     }
+  }
+
+  List<ChatMessage> _withoutTransientWelcomeIntro({
+    required List<ChatMessage> messages,
+    required ExperienceSnapshot experience,
+  }) {
+    final isWelcome = customerProfile?.isWelcomeJourney ?? false;
+    if (!isWelcome || messages.isEmpty) {
+      return messages;
+    }
+
+    final firstMessage = messages.first;
+    final isIntroMessage =
+        !firstMessage.isUser && firstMessage.text == experience.coach.intro;
+    if (!isIntroMessage) {
+      return messages;
+    }
+
+    return messages.skip(1).toList(growable: false);
   }
 
   bool get isFirebaseEnabled => _repository.isFirebaseEnabled;
@@ -265,6 +285,22 @@ class DashboardController extends ChangeNotifier {
         connected: connected,
         provider: provider,
       );
+    } catch (error) {
+      errorMessage = error.toString();
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshSupportBookings() async {
+    final patientId = selectedPatientId;
+    if (patientId == null) {
+      return;
+    }
+
+    try {
+      supportBookings = await _repository.fetchSupportBookings(patientId);
+      errorMessage = null;
     } catch (error) {
       errorMessage = error.toString();
     } finally {

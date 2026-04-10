@@ -61,12 +61,19 @@ class _CompassShellState extends State<CompassShell> {
 
   void _selectTab(int index) {
     if (_currentIndex == index) {
+      if (index == 2) {
+        _controller.refreshSupportBookings();
+      }
       return;
     }
 
     setState(() {
       _currentIndex = index;
     });
+
+    if (index == 2) {
+      _controller.refreshSupportBookings();
+    }
 
     _pageController.animateToPage(
       index,
@@ -223,7 +230,18 @@ class _CompassShellState extends State<CompassShell> {
                                 ),
                                 child: Column(
                                   children: [
-                                    const _ShellTopBar(),
+                                    const Padding(
+                                      padding: EdgeInsets.fromLTRB(
+                                        18,
+                                        18,
+                                        18,
+                                        0,
+                                      ),
+                                      child: Align(
+                                        alignment: Alignment.centerRight,
+                                        child: _ProfileButton(),
+                                      ),
+                                    ),
                                     Expanded(
                                       child: PageView(
                                         controller: _pageController,
@@ -231,6 +249,10 @@ class _CompassShellState extends State<CompassShell> {
                                           setState(() {
                                             _currentIndex = index;
                                           });
+                                          if (index == 2) {
+                                            _controller
+                                                .refreshSupportBookings();
+                                          }
                                         },
                                         children: const [
                                           CoachScreen(),
@@ -481,84 +503,6 @@ class _GlowOrb extends StatelessWidget {
   }
 }
 
-class _ShellTopBar extends StatelessWidget {
-  const _ShellTopBar();
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Consumer<DashboardController>(
-      builder: (context, controller, _) {
-        final experience = controller.experience;
-        final summary = experience == null
-            ? 'Bringing the current plan into view.'
-            : controller.isWelcomeJourney
-                ? 'Start with one useful next step.'
-                : 'Evidence first. One next step.';
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.68),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Longevity Compass',
-                        style: textTheme.titleMedium?.copyWith(
-                          color: AppPalette.ink,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        summary,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: AppPalette.ink.withValues(alpha: 0.7),
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: controller.isLoading
-                      ? null
-                      : () {
-                          controller.refresh();
-                        },
-                  icon: controller.isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2.2),
-                        )
-                      : const Icon(Icons.refresh_rounded),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.8),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const _ProfileButton(),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _ProfileButton extends StatelessWidget {
   const _ProfileButton();
 
@@ -763,7 +707,8 @@ class _ProfileSheet extends StatelessWidget {
                             ),
                             const SizedBox(height: 16),
                             for (var index = 0;
-                                index < controller.supportedDemoPatientIds.length;
+                                index <
+                                    controller.supportedDemoPatientIds.length;
                                 index++) ...[
                               if (controller.hasPatient(
                                 controller.supportedDemoPatientIds[index],
@@ -771,9 +716,9 @@ class _ProfileSheet extends StatelessWidget {
                                 _LoginAccountRow(
                                   patientId:
                                       controller.supportedDemoPatientIds[index],
-                                  selected:
-                                      controller.supportedDemoPatientIds[index] ==
-                                          controller.selectedPatientId,
+                                  selected: controller
+                                          .supportedDemoPatientIds[index] ==
+                                      controller.selectedPatientId,
                                   onTap: () async {
                                     Navigator.of(context).pop();
                                     await controller.selectPatient(
