@@ -22,7 +22,13 @@ class _CoachScreenState extends State<CoachScreen> {
   final SpeechToText _speechToText = SpeechToText();
   bool _speechAvailable = false;
   bool _isListening = false;
+  bool _discardSpeechResults = false;
   String? _voiceStatus;
+
+  bool get _hasActiveVoiceSession =>
+      _isListening ||
+      _speechToText.isListening ||
+      _speechToText.lastStatus == 'listening';
 
   @override
   void initState() {
@@ -47,6 +53,7 @@ class _CoachScreenState extends State<CoachScreen> {
         }
         setState(() {
           _isListening = false;
+          _discardSpeechResults = false;
           _voiceStatus = 'Voice input is not available right now.';
         });
       },
@@ -71,6 +78,10 @@ class _CoachScreenState extends State<CoachScreen> {
       _isListening = status == 'listening';
       if (status == 'listening') {
         _voiceStatus = 'Listening... say your question.';
+      } else if (_discardSpeechResults &&
+          (status == 'done' || status == 'notListening')) {
+        _discardSpeechResults = false;
+        _voiceStatus = null;
       } else if (status == 'done' || status == 'notListening') {
         _voiceStatus = 'Voice captured. Review and send.';
       }
@@ -78,6 +89,10 @@ class _CoachScreenState extends State<CoachScreen> {
   }
 
   void _handleSpeechResult(SpeechRecognitionResult result) {
+    if (_discardSpeechResults) {
+      return;
+    }
+
     final spokenText = result.recognizedWords.trim();
     if (spokenText.isEmpty) {
       return;
@@ -99,15 +114,65 @@ class _CoachScreenState extends State<CoachScreen> {
     });
   }
 
+  Future<void> _stopVoiceInput({
+    bool discardPendingResults = false,
+    String? statusMessage,
+  }) async {
+    final hadActiveVoiceSession = _hasActiveVoiceSession;
+
+    if (!hadActiveVoiceSession && !discardPendingResults) {
+      if (!mounted || statusMessage == null) {
+        return;
+      }
+      setState(() {
+        _voiceStatus = statusMessage;
+      });
+      return;
+    }
+
+    _discardSpeechResults = discardPendingResults;
+
+    if (mounted) {
+      setState(() {
+        _isListening = false;
+        _voiceStatus = statusMessage;
+      });
+    }
+
+    if (discardPendingResults) {
+      await _speechToText.cancel();
+      if (!mounted || !_discardSpeechResults) {
+        return;
+      }
+      setState(() {
+        _voiceStatus ??= statusMessage;
+      });
+      return;
+    }
+
+    await _speechToText.stop();
+  }
+
   Future<void> _send(DashboardController controller, String message) async {
     final trimmed = message.trim();
     if (trimmed.isEmpty) {
       return;
     }
-    _textController.clear();
-    if (_isListening) {
-      await _speechToText.stop();
+
+    if (_hasActiveVoiceSession || _discardSpeechResults) {
+      await _stopVoiceInput(
+        discardPendingResults: true,
+        statusMessage: 'Voice input stopped.',
+      );
     }
+
+    _textController.clear();
+    if (mounted) {
+      setState(() {
+        _voiceStatus = null;
+      });
+    }
+
     await controller.sendCoachMessage(trimmed);
   }
 
@@ -124,11 +189,12 @@ class _CoachScreenState extends State<CoachScreen> {
       return;
     }
 
-    if (_isListening) {
-      await _speechToText.stop();
+    if (_hasActiveVoiceSession) {
+      await _stopVoiceInput(statusMessage: 'Voice captured. Review and send.');
       return;
     }
 
+    _discardSpeechResults = false;
     final didStart = await _speechToText.listen(
       onResult: _handleSpeechResult,
       listenOptions: SpeechListenOptions(
@@ -355,15 +421,20 @@ class _CoachScreenState extends State<CoachScreen> {
                               controller.isSendingMessage ? null : _toggleVoice,
                           icon: Icon(
                             _isListening
-                                ? Icons.stop_circle_outlined
+                                ? Icons.mic_rounded
                                 : Icons.mic_none_rounded,
                           ),
                           style: IconButton.styleFrom(
                             backgroundColor: _isListening
-                                ? AppPalette.forest
+                                ? AppPalette.coral
                                 : Colors.white.withValues(alpha: 0.82),
                             foregroundColor:
                                 _isListening ? Colors.white : AppPalette.ink,
+                            side: BorderSide(
+                              color: _isListening
+                                  ? AppPalette.wine.withValues(alpha: 0.32)
+                                  : AppPalette.ink.withValues(alpha: 0.06),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -383,7 +454,9 @@ class _CoachScreenState extends State<CoachScreen> {
                       child: Text(
                         _voiceStatus!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppPalette.ink.withValues(alpha: 0.64),
+                              color: _isListening
+                                  ? AppPalette.coral
+                                  : AppPalette.ink.withValues(alpha: 0.64),
                               fontWeight: FontWeight.w700,
                             ),
                       ),

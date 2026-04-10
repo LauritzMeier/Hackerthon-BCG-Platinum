@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional
 
+from .cardiovascular import assess_cardiovascular_health, is_recent_relative_to_profile
 from .journey_context import build_care_context, build_data_coverage
 
 
@@ -60,32 +61,6 @@ def _normalize(obj):
     return obj
 
 
-def _parse_date(value) -> Optional[datetime]:
-    if not value:
-        return None
-
-    text = str(value)
-    try:
-        return datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
-        for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
-            try:
-                return datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
-            except ValueError:
-                continue
-    return None
-
-
-def _is_recent_date(value, max_age_days: int = 45) -> bool:
-    parsed = _parse_date(value)
-    if parsed is None:
-        return False
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    age = datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)
-    return age.days <= max_age_days
-
-
 def _build_sleep_pillar(profile: Dict) -> Dict:
     score = _to_float(profile.get("sleep_recovery_score"))
     quality_delta = _to_float(profile.get("sleep_quality_7d_avg")) - _to_float(
@@ -112,31 +87,15 @@ def _build_sleep_pillar(profile: Dict) -> Dict:
 
 
 def _build_cardiovascular_pillar(profile: Dict) -> Dict:
-    score = _to_float(profile.get("cardiovascular_fitness_score"))
-    resting_hr_delta = _to_float(profile.get("resting_hr_7d_avg")) - _to_float(
-        profile.get("resting_hr_30d_avg")
-    )
-    hrv_delta = _to_float(profile.get("hrv_7d_avg")) - _to_float(profile.get("hrv_30d_avg"))
-    trend = "stable"
-    if hrv_delta >= 1.5 and resting_hr_delta <= -1.0:
-        trend = "improving"
-    elif hrv_delta <= -1.5 and resting_hr_delta >= 1.0:
-        trend = "drifting"
+    assessment = assess_cardiovascular_health(profile)
     return {
         "id": "cardiovascular_health",
         "name": "Cardiovascular Health",
-        "score": _round(score),
-        "state": _score_to_state(score),
-        "trend": trend,
-        "why_it_matters": "Cardiovascular health affects endurance, prevention, and long-term risk.",
-        "key_signals": {
-            "resting_hr_7d_avg": _round(_to_float(profile.get("resting_hr_7d_avg"))),
-            "resting_hr_30d_avg": _round(_to_float(profile.get("resting_hr_30d_avg"))),
-            "hrv_7d_avg": _round(_to_float(profile.get("hrv_7d_avg"))),
-            "hrv_30d_avg": _round(_to_float(profile.get("hrv_30d_avg"))),
-            "sbp_mmhg": _round(_to_float(profile.get("sbp_mmhg"))),
-            "dbp_mmhg": _round(_to_float(profile.get("dbp_mmhg"))),
-        },
+        "score": assessment["score"],
+        "state": _score_to_state(assessment["score"]),
+        "trend": assessment["trend"],
+        "why_it_matters": assessment["summary"],
+        "key_signals": assessment["key_signals"],
     }
 
 
@@ -256,7 +215,11 @@ def _has_meal_tracking(profile: Dict) -> bool:
 
 
 def _has_recent_survey_signal(profile: Dict) -> bool:
-    return _is_recent_date(profile.get("latest_survey_date"), max_age_days=365)
+    return is_recent_relative_to_profile(
+        profile,
+        profile.get("latest_survey_date"),
+        max_age_days=365,
+    )
 
 
 def _has_recent_lab_signal(profile: Dict) -> bool:
@@ -548,10 +511,21 @@ def _recommended_offer(primary_focus: Dict, offers: List[Dict], flags: List[Dict
 
     pillar_offer_preference = {
         "sleep_recovery": {"sleep_recovery_package"},
-        "cardiovascular_health": {"preventive_cardiometabolic_panel"},
-        "metabolic_health": {"preventive_cardiometabolic_panel", "nutrition_coaching"},
+        "cardiovascular_health": {
+            "cardiology_follow_up_visit",
+            "preventive_cardiometabolic_panel",
+            "cardiac_rehab_intake",
+        },
+        "metabolic_health": {
+            "preventive_cardiometabolic_panel",
+            "cardiometabolic_nutrition_consult",
+            "nutrition_coaching",
+        },
         "movement_fitness": {"movement_program"},
-        "nutrition_quality": {"nutrition_coaching"},
+        "nutrition_quality": {
+            "cardiometabolic_nutrition_consult",
+            "nutrition_coaching",
+        },
         "mental_resilience": {"sleep_recovery_package", "nutrition_coaching"},
     }
     allowed = pillar_offer_preference.get(primary_focus["pillar_id"], set())

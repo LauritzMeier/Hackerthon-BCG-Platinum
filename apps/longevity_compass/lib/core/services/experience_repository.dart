@@ -76,13 +76,16 @@ class ExperienceRepository {
     List<SupportBooking> supportBookings = const [],
   }) async {
     if (experience != null && shouldUseLiveAgentFor(customerProfile)) {
-      final replyText = await _agentChatService.requestReplyText(
+      final agentReply = await _agentChatService.requestReply(
         message: message,
         patientId: patientId,
       );
       return CoachReply(
-        reply: replyText,
+        reply: agentReply.reply,
         primaryFocus: experience.weeklyPlan.primaryFocus,
+        updatedPillars: agentReply.evidenceIndex
+            .map(PillarSnapshot.fromJson)
+            .toList(growable: false),
       );
     }
 

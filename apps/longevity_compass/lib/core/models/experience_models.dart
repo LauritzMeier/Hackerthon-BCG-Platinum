@@ -848,17 +848,26 @@ class SupportBooking {
 }
 
 class CoachReply {
-  CoachReply({required this.reply, required this.primaryFocus});
+  CoachReply({
+    required this.reply,
+    required this.primaryFocus,
+    this.updatedPillars = const <PillarSnapshot>[],
+  });
 
   factory CoachReply.fromJson(Map<String, dynamic> json) {
     return CoachReply(
       reply: _asString(json['reply']),
       primaryFocus: PrimaryFocus.fromJson(_asMap(json['primary_focus'])),
+      updatedPillars: _asObjectList(
+        json['evidence_index'],
+        PillarSnapshot.fromJson,
+      ),
     );
   }
 
   final String reply;
   final PrimaryFocus primaryFocus;
+  final List<PillarSnapshot> updatedPillars;
 }
 
 class ChatMessage {

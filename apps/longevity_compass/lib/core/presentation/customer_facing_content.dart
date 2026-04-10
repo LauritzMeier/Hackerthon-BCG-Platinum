@@ -59,7 +59,7 @@ const Map<String, DemoPatientIdentity> _demoPatientsById =
     loginAlias: 'patient1',
     subtitle: 'Active recovery journey',
     personaText:
-        'Daniel Moreau is a 66-year-old man in France on an active recovery and risk-reduction journey. He already has a smartwatch connected, so the app can see movement, sleep, resting heart rate, and recovery trends, and it also has enough medical context to know that glycemic control, lipid profile, and low daily activity are the main issues right now. He is not a blank-slate wellness user; he is someone who needs clear, practical guidance on rebuilding movement safely, understanding his current risk picture, and deciding which follow-up support would genuinely help next.',
+        'Daniel Moreau is a 66-year-old man in France recovering from a recent heart attack, on top of type 2 diabetes and dyslipidemia. He already has a smartwatch connected, so the app can see movement, sleep, resting heart rate, and recovery trends, and it also has enough medical context to know that cardiac follow-up, glucose control, lipid management, and realistic nutrition support all matter right now. He is not a blank-slate wellness user; he needs safe recovery pacing, clearer cardiology next steps, and food support that fits both heart recovery and metabolic risk.',
   ),
 };
 
@@ -78,7 +78,8 @@ const Map<String, OfferPracticalInfo> _offerPracticalInfoByCode =
     title: 'Cardiology follow-up visit',
     categoryLabel: 'Cardiology visit',
     priceLabel: 'EUR 220',
-    locationLabel: 'Institut Cardiaque Rive Gauche, 42 Rue de Sevres, Paris 75007',
+    locationLabel:
+        'Institut Cardiaque Rive Gauche, 42 Rue de Sevres, Paris 75007',
     locationShortLabel: '42 Rue de Sevres',
     clinicianLabel: 'Dr. Antoine Lefevre, cardiologist',
     formatLabel: '30 to 45 minute follow-up visit',
@@ -111,7 +112,7 @@ const Map<String, OfferPracticalInfo> _offerPracticalInfoByCode =
     formatLabel: 'Weekly coaching plan',
   ),
   'nutrition_coaching': OfferPracticalInfo(
-    title: 'Nutrition reset coaching',
+    title: 'Cardiometabolic nutrition coaching',
     categoryLabel: 'Coaching plan',
     priceLabel: 'EUR 119 / month',
     locationLabel: 'Maison de la Longevite, 18 Rue de Rennes, Paris 75006',
@@ -119,8 +120,17 @@ const Map<String, OfferPracticalInfo> _offerPracticalInfoByCode =
     clinicianLabel: 'Sophie Laurent, nutrition coach',
     formatLabel: 'Weekly habit coaching',
   ),
+  'cardiometabolic_nutrition_consult': OfferPracticalInfo(
+    title: 'Cardiometabolic dietitian consult',
+    categoryLabel: 'Dietitian visit',
+    priceLabel: 'EUR 160',
+    locationLabel: 'Maison de la Longevite, 18 Rue de Rennes, Paris 75006',
+    locationShortLabel: '18 Rue de Rennes',
+    clinicianLabel: 'Dr. Lea Fournier and Sophie Laurent',
+    formatLabel: '45 minute nutrition consult',
+  ),
   'heart_health_supplement_review': OfferPracticalInfo(
-    title: 'Supplement safety review',
+    title: 'Heart & lipid supplement review',
     categoryLabel: 'Add-on review',
     priceLabel: 'EUR 95',
     locationLabel: 'Maison de la Longevite, 18 Rue de Rennes, Paris 75006',
@@ -150,7 +160,8 @@ const Map<String, OfferPracticalInfo> _offerPracticalInfoByCode =
     title: 'Heart health screening visit',
     categoryLabel: 'Screening visit',
     priceLabel: 'EUR 260',
-    locationLabel: 'Institut Cardiaque Rive Gauche, 42 Rue de Sevres, Paris 75007',
+    locationLabel:
+        'Institut Cardiaque Rive Gauche, 42 Rue de Sevres, Paris 75007',
     locationShortLabel: '42 Rue de Sevres',
     clinicianLabel: 'Dr. Antoine Lefevre, cardiologist',
     formatLabel: '45 minute screening visit',
@@ -311,7 +322,8 @@ OfferPracticalInfo practicalInfoForOfferCode(
     categoryLabel:
         fallbackCategory.isNotEmpty ? fallbackCategory : 'Clinic support',
     priceLabel: offerType == 'starter' ? 'Included' : 'Ask clinic',
-    locationLabel: offerType == 'starter' ? 'In app' : 'Clinic team will confirm',
+    locationLabel:
+        offerType == 'starter' ? 'In app' : 'Clinic team will confirm',
     locationShortLabel: offerType == 'starter' ? 'In app' : 'TBD',
     clinicianLabel: 'Clinic team',
     formatLabel: fallbackFormat.isNotEmpty ? fallbackFormat : 'To be confirmed',

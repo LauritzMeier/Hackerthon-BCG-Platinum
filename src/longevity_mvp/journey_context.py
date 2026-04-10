@@ -7,6 +7,7 @@ from .offer_catalog import get_offer_catalog_entry
 
 
 CONDITION_LABELS = {
+    "coronary_artery_disease": "coronary artery disease",
     "type2_diabetes": "type 2 diabetes",
     "dyslipidaemia": "an unhealthy cholesterol pattern",
     "hypertension": "high blood pressure",
@@ -44,6 +45,7 @@ CARDIO_CONDITIONS = {
 }
 
 CARDIO_VISIT_PREFIXES = ("I20", "I21", "I22", "I25", "I50")
+ACUTE_CARDIO_VISIT_PREFIXES = ("I21", "I22")
 
 
 def split_pipe_values(value) -> List[str]:
@@ -97,6 +99,11 @@ def _format_date(value: str) -> str:
 def _select_relevant_visit(visits: List[Dict], primary_focus: Dict) -> Optional[Dict]:
     if not visits:
         return None
+
+    for visit in reversed(visits):
+        code = visit.get("code", "")
+        if any(code.startswith(prefix) for prefix in ACUTE_CARDIO_VISIT_PREFIXES):
+            return visit
 
     prefixes = FOCUS_CODE_PREFIXES.get(primary_focus.get("pillar_id", ""), tuple())
     if prefixes:

@@ -37,6 +37,16 @@ class AgentChatEvent {
   final bool isDone;
 }
 
+class AgentChatReply {
+  const AgentChatReply({
+    required this.reply,
+    this.evidenceIndex = const <Map<String, dynamic>>[],
+  });
+
+  final String reply;
+  final List<Map<String, dynamic>> evidenceIndex;
+}
+
 class AgentChatService {
   AgentChatService({http.Client? client}) : _client = client ?? http.Client();
 
@@ -76,6 +86,18 @@ class AgentChatService {
     required String message,
     required String patientId,
   }) async {
+    final response = await requestReply(
+      message: message,
+      patientId: patientId,
+    );
+    return response.reply;
+  }
+
+  Future<AgentChatReply> requestReply({
+    required String message,
+    required String patientId,
+    bool includeEvidenceIndex = true,
+  }) async {
     late final http.Response response;
     try {
       response = await _client.post(
@@ -84,6 +106,7 @@ class AgentChatService {
         body: jsonEncode({
           'message': message,
           'patient_id': patientId,
+          'include_evidence_index': includeEvidenceIndex,
         }),
       );
     } on Exception catch (error) {
@@ -100,21 +123,12 @@ class AgentChatService {
     }
 
     final payload = _decodeJson(response.body);
-    final sections = payload['sections'];
-    if (sections is Iterable) {
-      final items = sections
-          .whereType<Object>()
-          .map((item) => item.toString().trim())
-          .where((item) => item.isNotEmpty)
-          .toList(growable: false);
-      if (items.isNotEmpty) {
-        return items.join('\n\n');
-      }
-    }
-
-    final reply = payload['reply']?.toString().trim() ?? '';
+    final reply = _visibleReplyFromPayload(payload);
     if (reply.isNotEmpty) {
-      return reply;
+      return AgentChatReply(
+        reply: reply,
+        evidenceIndex: _decodeEvidenceIndex(payload['evidence_index']),
+      );
     }
 
     throw const AgentChatException(
@@ -163,8 +177,9 @@ class AgentChatService {
     String? currentEvent;
     final dataLines = <String>[];
 
-    await for (final line
-        in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+    await for (final line in response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())) {
       if (line.startsWith('event:')) {
         currentEvent = line.substring(6).trim();
         continue;
@@ -236,7 +251,8 @@ class AgentChatService {
     return value;
   }
 
-  Stream<AgentChatEvent> _handleEvent(String? eventName, String rawData) async* {
+  Stream<AgentChatEvent> _handleEvent(
+      String? eventName, String rawData) async* {
     switch (eventName) {
       case 'delta':
         final payload = _decodeJson(rawData);
@@ -254,6 +270,30 @@ class AgentChatService {
       default:
         break;
     }
+  }
+
+  String _visibleReplyFromPayload(Map<String, dynamic> payload) {
+    final sections = payload['sections'];
+    if (sections is Iterable) {
+      final items = sections
+          .whereType<Object>()
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
+      if (items.isNotEmpty) {
+        return items.join('\n\n');
+      }
+    }
+
+    return payload['reply']?.toString().trim() ?? '';
+  }
+
+  List<Map<String, dynamic>> _decodeEvidenceIndex(dynamic value) {
+    if (value is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    return value.whereType<Map<String, dynamic>>().toList(growable: false);
   }
 
   Map<String, dynamic> _decodeJson(String rawData) {

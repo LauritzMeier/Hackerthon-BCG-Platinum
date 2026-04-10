@@ -98,6 +98,7 @@ class DashboardController extends ChangeNotifier {
         customerProfile: customerProfile,
         supportBookings: supportBookings,
       );
+      _applyCoachReply(reply);
       final assistantMessage = ChatMessage.assistant(reply.reply);
       chatMessages = <ChatMessage>[...chatMessages, assistantMessage];
 
@@ -143,6 +144,137 @@ class DashboardController extends ChangeNotifier {
     }
 
     return messages.skip(1).toList(growable: false);
+  }
+
+  void _applyCoachReply(CoachReply reply) {
+    final currentExperience = experience;
+    if (currentExperience == null) {
+      return;
+    }
+
+    final nextPrimaryFocus = _resolvedPrimaryFocus(
+      reply.primaryFocus,
+      fallback: currentExperience.weeklyPlan.primaryFocus,
+    );
+    final nextPillars = _mergeUpdatedPillars(
+      currentExperience.compass.pillars,
+      reply.updatedPillars,
+    );
+    final nextPeerComparison = _mergePeerComparison(
+      currentExperience.compass.peerComparison,
+      nextPillars,
+    );
+
+    experience = ExperienceSnapshot(
+      patientId: currentExperience.patientId,
+      generatedAt: currentExperience.generatedAt,
+      profileSummary: currentExperience.profileSummary,
+      compass: CompassSnapshot(
+        overallDirection: currentExperience.compass.overallDirection,
+        chronologicalAge: currentExperience.compass.chronologicalAge,
+        estimatedBiologicalAge:
+            currentExperience.compass.estimatedBiologicalAge,
+        primaryFocus: nextPrimaryFocus,
+        pillars: nextPillars,
+        peerComparison: nextPeerComparison,
+        suggestedQuestions: currentExperience.compass.suggestedQuestions,
+      ),
+      weeklyPlan: WeeklyPlan(
+        title: currentExperience.weeklyPlan.title,
+        primaryFocus: nextPrimaryFocus,
+        actions: currentExperience.weeklyPlan.actions,
+        checkInPrompt: currentExperience.weeklyPlan.checkInPrompt,
+      ),
+      coach: currentExperience.coach,
+      journeyStart: currentExperience.journeyStart,
+      careContext: currentExperience.careContext,
+      dataCoverage: currentExperience.dataCoverage,
+      progressSummary: currentExperience.progressSummary,
+      alerts: currentExperience.alerts,
+      offers: currentExperience.offers,
+    );
+  }
+
+  PrimaryFocus _resolvedPrimaryFocus(
+    PrimaryFocus candidate, {
+    required PrimaryFocus fallback,
+  }) {
+    if (candidate.pillarId.isEmpty || candidate.pillarName.isEmpty) {
+      return fallback;
+    }
+    return candidate;
+  }
+
+  List<PillarSnapshot> _mergeUpdatedPillars(
+    List<PillarSnapshot> currentPillars,
+    List<PillarSnapshot> updatedPillars,
+  ) {
+    if (updatedPillars.isEmpty) {
+      return currentPillars;
+    }
+    if (currentPillars.isEmpty) {
+      return updatedPillars;
+    }
+
+    final updatedById = <String, PillarSnapshot>{
+      for (final pillar in updatedPillars) pillar.id: pillar,
+    };
+
+    return currentPillars
+        .map((pillar) => updatedById[pillar.id] ?? pillar)
+        .toList(growable: false);
+  }
+
+  PeerComparisonSnapshot _mergePeerComparison(
+    PeerComparisonSnapshot currentComparison,
+    List<PillarSnapshot> pillars,
+  ) {
+    if (currentComparison.items.isEmpty || pillars.isEmpty) {
+      return currentComparison;
+    }
+
+    final pillarById = <String, PillarSnapshot>{
+      for (final pillar in pillars) pillar.id: pillar,
+    };
+
+    final nextItems = currentComparison.items.map((item) {
+      final pillar = pillarById[item.pillarId];
+      if (pillar == null) {
+        return item;
+      }
+
+      return PeerComparisonItem(
+        pillarId: item.pillarId,
+        pillarName: pillar.name.isNotEmpty ? pillar.name : item.pillarName,
+        patientScore: pillar.score,
+        patientScoreLabel: pillar.scoreLabel,
+        peerScore: item.peerScore,
+        peerScoreLabel: item.peerScoreLabel,
+        difference: pillar.score - item.peerScore,
+        hasEnoughData: pillar.hasEnoughData,
+        scoreConfidence: pillar.scoreConfidence,
+      );
+    }).toList(growable: false);
+
+    if (nextItems.isEmpty) {
+      return currentComparison;
+    }
+
+    final strongestRelative = nextItems.reduce(
+      (best, item) => item.difference > best.difference ? item : best,
+    );
+    final biggestGap = nextItems.reduce(
+      (worst, item) => item.difference < worst.difference ? item : worst,
+    );
+
+    return PeerComparisonSnapshot(
+      headline: currentComparison.headline,
+      cohortLabel: currentComparison.cohortLabel,
+      sampleSize: currentComparison.sampleSize,
+      strongestRelativePillarId: strongestRelative.pillarId,
+      biggestGapPillarId: biggestGap.pillarId,
+      items: nextItems,
+    );
   }
 
   bool get isFirebaseEnabled => _repository.isFirebaseEnabled;

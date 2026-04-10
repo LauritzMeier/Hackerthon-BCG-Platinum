@@ -14,6 +14,7 @@ from .coach_voice import derive_persona_context
 from .firebase_client import get_patient_conversation_state, get_patient_firebase_context
 from .patient_updates import apply_patient_reported_updates
 from longevity_mvp.bootstrap import ensure_local_warehouse
+from longevity_mvp.cardiovascular import assess_cardiovascular_health
 from longevity_mvp.repository import WarehouseRepository
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"
@@ -213,30 +214,19 @@ def _build_sleep(profile: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _build_cardio(profile: Dict[str, Any]) -> Dict[str, Any]:
-    hr_30 = _safe_float(profile.get("resting_hr_30d_avg"))
-    hr_7 = _safe_float(profile.get("resting_hr_7d_avg"))
-    hrv_30 = _safe_float(profile.get("hrv_30d_avg"))
-    hrv_7 = _safe_float(profile.get("hrv_7d_avg"))
-    bp_penalty = max(0.0, (_safe_float(profile.get("sbp_mmhg")) - 120.0) * 0.5) + max(
-        0.0, (_safe_float(profile.get("dbp_mmhg")) - 80.0) * 0.6
-    )
-    score = max(0.0, min(100.0, 100.0 - (hr_30 - 58.0) - bp_penalty + (hrv_30 * 0.35)))
+    assessment = assess_cardiovascular_health(profile)
+    score = assessment["score"]
     return {
         "id": "cardiovascular_health",
         "name": "Cardiovascular Health",
         "score": round(score, 1),
         "state": _score_to_state(score),
-        "trend": _trend_from_delta((hrv_7 - hrv_30) - (hr_7 - hr_30)),
-        "explanation": "Cardiovascular health combines resting heart rate, HRV, and blood pressure context.",
+        "trend": assessment["trend"],
+        "explanation": assessment["summary"],
         "key_signals": {
-            "resting_hr_7d_avg": round(hr_7, 1),
-            "resting_hr_30d_avg": round(hr_30, 1),
-            "hrv_7d_avg": round(hrv_7, 1),
-            "hrv_30d_avg": round(hrv_30, 1),
+            **assessment["key_signals"],
             "spo2_7d_avg_pct": round(_safe_float(profile.get("spo2_7d_avg")), 1),
             "spo2_30d_avg_pct": round(_safe_float(profile.get("spo2_30d_avg")), 1),
-            "sbp_mmhg": _safe_float(profile.get("sbp_mmhg")),
-            "dbp_mmhg": _safe_float(profile.get("dbp_mmhg")),
         },
         "data_sources": ["curated.patient_metrics", "curated.patient_profile"],
     }

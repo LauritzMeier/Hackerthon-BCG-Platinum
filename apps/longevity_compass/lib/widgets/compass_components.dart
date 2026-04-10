@@ -170,6 +170,11 @@ class CompassHeroCard extends StatelessWidget {
     final theme = Theme.of(context);
     final sourceLabels = _heroSourceLabels(experience);
     final showBiologicalAge = _hasReliableBiologicalAgeEstimate(experience);
+    final biologicalAge = experience.compass.estimatedBiologicalAge;
+    final chronologicalAge = experience.compass.chronologicalAge;
+    final ageGapYears = experience.profileSummary.ageGapYears ??
+        (biologicalAge == null ? null : biologicalAge - chronologicalAge);
+    final reliablePillarCount = _reliablePillarCount(experience);
 
     return Container(
       padding: const EdgeInsets.all(28),
@@ -195,6 +200,24 @@ class CompassHeroCard extends StatelessWidget {
                 value: experience.dataCoverage.confidenceLabel,
               ),
             ],
+          ),
+          const SizedBox(height: 22),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: showBiologicalAge
+                ? _BiologicalAgeNorthStar(
+                    biologicalAge: biologicalAge!,
+                    chronologicalAge: chronologicalAge,
+                    ageGapYears: ageGapYears,
+                  )
+                : _BiologicalAgePending(
+                    reliablePillarCount: reliablePillarCount,
+                  ),
           ),
           const SizedBox(height: 22),
           Text(
@@ -247,24 +270,6 @@ class CompassHeroCard extends StatelessWidget {
                 )
                 .toList(growable: false),
           ),
-          const SizedBox(height: 18),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: Text(
-              showBiologicalAge
-                  ? 'Estimated biological age: ${experience.compass.estimatedBiologicalAge!.toStringAsFixed(1)}. We are showing it because enough pillar data is connected.'
-                  : 'Biological age is hidden for now. There is not enough reliable signal yet to show it precisely.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.88),
-                height: 1.4,
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -276,9 +281,13 @@ bool _hasReliableBiologicalAgeEstimate(ExperienceSnapshot experience) {
     return false;
   }
 
-  final precisePillars =
-      experience.compass.pillars.where((pillar) => pillar.hasEnoughData).length;
-  return precisePillars >= 4;
+  return _reliablePillarCount(experience) >= 4;
+}
+
+int _reliablePillarCount(ExperienceSnapshot experience) {
+  return experience.compass.pillars
+      .where((pillar) => pillar.hasEnoughData)
+      .length;
 }
 
 List<String> _heroSourceLabels(ExperienceSnapshot experience) {
@@ -338,9 +347,27 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
     if (!comparison.hasItems) {
       return const SizedBox.shrink();
     }
-    final hasLimitedPillars = comparison.items.any(
-      (item) => !item.hasEnoughData,
+    final showBiologicalAge = _hasReliableBiologicalAgeEstimate(
+      widget.experience,
     );
+    final biologicalAge = widget.experience.compass.estimatedBiologicalAge;
+    final chronologicalAge = widget.experience.compass.chronologicalAge;
+    final ageGapYears = widget.experience.profileSummary.ageGapYears ??
+        (biologicalAge == null ? null : biologicalAge - chronologicalAge);
+    final reliablePillarCount = _reliablePillarCount(widget.experience);
+    final primaryFocus = widget.experience.compass.primaryFocus;
+    final strongestPillarLabel = _pillarLabelForId(
+      comparison.items,
+      comparison.strongestRelativePillarId,
+    );
+    final biggestGapLabel = _pillarLabelForId(
+      comparison.items,
+      comparison.biggestGapPillarId,
+    );
+    final unscoredPillars = comparison.items
+        .where((item) => !item.hasEnoughData)
+        .map((item) => _shortPillarLabel(item.pillarName))
+        .toList(growable: false);
 
     final selectedComparison = comparison.items.firstWhere(
       (item) => item.pillarId == _selectedPillarId,
@@ -355,7 +382,6 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
             ? _appearanceForDirection('improving')
             : _appearanceForDirection('drifting'))
         : _appearanceForDataConfidence(selectedComparison.scoreConfidence);
-    final stateAppearance = _appearanceForState(selectedPillar.state);
     final trendAppearance = _appearanceForDirection(selectedPillar.trend);
 
     return Container(
@@ -375,192 +401,106 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _MiniBadge(
-                label: 'Six-pillar compass',
-                background: AppPalette.ink.withValues(alpha: 0.08),
-                foreground: AppPalette.ink,
-              ),
-              if (hasLimitedPillars)
-                _MiniBadge(
-                  label: 'Unknown pillars stay unscored',
-                  background: AppPalette.sand.withValues(alpha: 0.92),
-                  foreground: AppPalette.ink,
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
           Text(
-            _radarHeadline(comparison),
+            'Longevity compass',
             style: theme.textTheme.headlineSmall?.copyWith(
               color: AppPalette.ink,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          if (_radarSubtitle(comparison).isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              _radarSubtitle(comparison),
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: AppPalette.ink.withValues(alpha: 0.72),
-                height: 1.4,
-              ),
+          const SizedBox(height: 14),
+          showBiologicalAge
+              ? _CompassNorthStar(
+                  biologicalAge: biologicalAge!,
+                  chronologicalAge: chronologicalAge,
+                  ageGapYears: ageGapYears,
+                )
+              : _CompassNorthStarPending(
+                  reliablePillarCount: reliablePillarCount,
+                ),
+          const SizedBox(height: 14),
+          Text(
+            _compassSummaryLine(
+              primaryFocusLabel: _shortPillarLabel(primaryFocus.pillarName),
+              biggestGapLabel: biggestGapLabel,
+              strongestPillarLabel: strongestPillarLabel,
+              unscoredPillars: unscoredPillars,
             ),
-          ],
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: AppPalette.ink.withValues(alpha: 0.72),
+              height: 1.45,
+            ),
+          ),
           const SizedBox(height: 18),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final stacked = constraints.maxWidth < 920;
-
-              final chart = _CompassRadarDiagram(
-                items: comparison.items,
-                selectedPillarId: _selectedPillarId,
-                onSelect: (pillarId) {
-                  setState(() {
-                    _selectedPillarId = pillarId;
-                  });
-                },
-              );
-
-              final detail = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _MiniBadge(
-                        label: selectedComparison.pillarName,
-                        background: _pillarAccent(
-                          selectedComparison.pillarId,
-                        ).withValues(alpha: 0.16),
-                        foreground: AppPalette.ink,
-                      ),
-                      _MiniBadge(
-                        label: selectedComparison.hasEnoughData
-                            ? differenceAppearance.label
-                            : 'Not scored yet',
-                        background: differenceAppearance.background,
-                        foreground: differenceAppearance.foreground,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _comparisonHeadline(selectedComparison),
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: AppPalette.ink,
-                      fontWeight: FontWeight.w700,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _comparisonBody(
-                      selectedComparison,
-                      comparison,
-                      widget.experience.compass.primaryFocus,
-                    ),
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: AppPalette.ink.withValues(alpha: 0.74),
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  if (selectedComparison.hasEnoughData)
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        _ComparisonStatTile(
-                          label: 'You',
-                          value: selectedComparison.patientScoreLabel,
-                        ),
-                        _ComparisonStatTile(
-                          label: 'Age group',
-                          value: selectedComparison.peerScoreLabel,
-                        ),
-                      ],
-                    )
-                  else
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        const _ComparisonStatTile(
-                          label: 'You',
-                          value: '?',
-                        ),
-                        _ComparisonStatTile(
-                          label: 'Age group',
-                          value: selectedComparison.peerScoreLabel,
-                        ),
-                      ],
-                    ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _MiniBadge(
-                        label: stateAppearance.label,
-                        background: stateAppearance.background,
-                        foreground: stateAppearance.foreground,
-                      ),
-                      if (!selectedPillar.hasEnoughData)
-                        _MiniBadge(
-                          label: 'Estimate only',
-                          background: AppPalette.sand.withValues(alpha: 0.95),
-                          foreground: AppPalette.ink,
-                        ),
-                      _MiniBadge(
-                        label: trendAppearance.label,
-                        background: trendAppearance.background,
-                        foreground: trendAppearance.foreground,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    selectedPillar.whyItMatters,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: AppPalette.ink.withValues(alpha: 0.7),
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    selectedComparison.hasEnoughData
-                        ? 'Tap any pillar around the chart to drill into the comparison.'
-                        : 'Tap any pillar to see whether it is already scored or still waiting for data.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppPalette.ink.withValues(alpha: 0.56),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              );
-
-              if (stacked) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [chart, const SizedBox(height: 24), detail],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 6, child: chart),
-                  const SizedBox(width: 24),
-                  Expanded(flex: 5, child: detail),
-                ],
-              );
+          _CompassRadarDiagram(
+            items: comparison.items,
+            selectedPillarId: _selectedPillarId,
+            onSelect: (pillarId) {
+              setState(() {
+                _selectedPillarId = pillarId;
+              });
             },
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.78),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppPalette.ink.withValues(alpha: 0.05)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  selectedComparison.pillarName,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: AppPalette.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _MiniBadge(
+                      label: selectedComparison.hasEnoughData
+                          ? differenceAppearance.label
+                          : 'Not scored yet',
+                      background: differenceAppearance.background,
+                      foreground: differenceAppearance.foreground,
+                    ),
+                    _MiniBadge(
+                      label: trendAppearance.label,
+                      background: trendAppearance.background,
+                      foreground: trendAppearance.foreground,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _selectedPillarMetricLine(selectedComparison),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: AppPalette.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _selectedPillarSummary(
+                    selectedComparison,
+                    comparison,
+                    primaryFocus,
+                  ),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppPalette.ink.withValues(alpha: 0.7),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -584,9 +524,9 @@ class _CompassRadarDiagram extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final canvasSize =
-            math.min(constraints.maxWidth, 430.0).clamp(280.0, 430.0);
+            math.min(constraints.maxWidth, 520.0).clamp(320.0, 520.0);
         final center = canvasSize / 2;
-        final radius = canvasSize * 0.28;
+        final radius = canvasSize * 0.29;
         const chipWidth = 112.0;
         const chipHeight = 62.0;
 
@@ -942,45 +882,6 @@ class _CompassRadarPainter extends CustomPainter {
   bool shouldRepaint(covariant _CompassRadarPainter oldDelegate) {
     return oldDelegate.selectedPillarId != selectedPillarId ||
         oldDelegate.items != items;
-  }
-}
-
-class _ComparisonStatTile extends StatelessWidget {
-  const _ComparisonStatTile({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 120),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.84),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppPalette.ink.withValues(alpha: 0.62),
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppPalette.ink,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -2096,7 +1997,7 @@ String _shortPillarLabel(String label) {
     case 'Sleep and Recovery':
       return 'Sleep';
     case 'Cardiovascular Health':
-      return 'Cardio';
+      return 'Cardiovascular';
     case 'Metabolic Health':
       return 'Metabolic';
     case 'Movement and Fitness':
@@ -2110,70 +2011,68 @@ String _shortPillarLabel(String label) {
   }
 }
 
-String _comparisonHeadline(PeerComparisonItem item) {
-  if (!item.hasEnoughData) {
-    return 'Not enough tracked data yet';
+String _pillarLabelForId(List<PeerComparisonItem> items, String pillarId) {
+  for (final item in items) {
+    if (item.pillarId == pillarId) {
+      return _shortPillarLabel(item.pillarName);
+    }
   }
-
-  final absoluteDifference = item.difference.abs();
-  if (absoluteDifference < 2) {
-    return 'Right in line with your age cohort';
-  }
-
-  final rounded = absoluteDifference >= 10
-      ? absoluteDifference.toStringAsFixed(0)
-      : absoluteDifference.toStringAsFixed(1);
-  return item.difference >= 0
-      ? '$rounded points ahead of peers'
-      : '$rounded points behind peers';
+  return '';
 }
 
-String _comparisonBody(
+String _selectedPillarSummary(
   PeerComparisonItem item,
   PeerComparisonSnapshot comparison,
   PrimaryFocus primaryFocus,
 ) {
   if (!item.hasEnoughData) {
-    return 'Your own score stays unscored here until enough recent tracking is connected. '
-        'The age-group baseline is still shown so you can see where this pillar usually sits.';
+    return 'Your score is still hidden here until more recent tracking is connected. The age-group line stays visible for orientation.';
   }
 
   final notes = <String>[];
-
-  if (item.pillarId == comparison.biggestGapPillarId) {
-    notes.add('This is the clearest gap against your age group right now.');
-  } else if (item.pillarId == comparison.strongestRelativePillarId) {
-    notes.add('This is currently your strongest pillar relative to peers.');
-  }
-
   if (item.pillarId == primaryFocus.pillarId) {
-    notes.add('It also matches the area the app is prioritizing first.');
+    notes.add('Main focus this week.');
+  }
+  if (item.pillarId == comparison.biggestGapPillarId) {
+    notes.add('This is your biggest gap right now.');
+  } else if (item.pillarId == comparison.strongestRelativePillarId) {
+    notes.add('This is your strongest relative pillar.');
   }
 
   if (item.difference.abs() < 2) {
-    notes.add('You are tracking very close to the cohort average here.');
+    notes.add('You are close to the age-group average.');
   } else if (item.difference > 0) {
-    notes.add('You are outperforming the age-group average on this pillar.');
+    notes.add('You are ahead of the age-group average.');
   } else {
-    notes.add('You are trailing the age-group average on this pillar.');
+    notes.add('You are below the age-group average.');
   }
 
   return notes.join(' ');
 }
 
-String _radarHeadline(PeerComparisonSnapshot comparison) {
-  final hasLimitedPillars = comparison.items.any((item) => !item.hasEnoughData);
-  return hasLimitedPillars
-      ? 'How your tracked pillars compare with your age group'
-      : 'How your six pillars compare with your age group';
+String _compassSummaryLine({
+  required String primaryFocusLabel,
+  required String biggestGapLabel,
+  required String strongestPillarLabel,
+  required List<String> unscoredPillars,
+}) {
+  final parts = <String>[];
+  parts.add('Focus now on $primaryFocusLabel.');
+  if (biggestGapLabel.isNotEmpty) {
+    parts.add('Biggest gap: $biggestGapLabel.');
+  }
+  if (strongestPillarLabel.isNotEmpty) {
+    parts.add('Strongest: $strongestPillarLabel.');
+  }
+  if (unscoredPillars.isNotEmpty) {
+    parts.add('Not scored yet: ${unscoredPillars.join(', ')}.');
+  }
+  return parts.join(' ');
 }
 
-String _radarSubtitle(PeerComparisonSnapshot comparison) {
-  final hasLimitedPillars = comparison.items.any((item) => !item.hasEnoughData);
-  if (!hasLimitedPillars) {
-    return '';
-  }
-  return 'Pillars without enough recent data stay blank until they can be scored confidently.';
+String _selectedPillarMetricLine(PeerComparisonItem item) {
+  final youValue = item.hasEnoughData ? item.patientScoreLabel : '?';
+  return 'You $youValue  •  Age group ${item.peerScoreLabel}';
 }
 
 _BadgeAppearance _appearanceForDataConfidence(String raw) {
@@ -2318,6 +2217,254 @@ class _HeroPill extends StatelessWidget {
   }
 }
 
+class _CompassNorthStar extends StatelessWidget {
+  const _CompassNorthStar({
+    required this.biologicalAge,
+    required this.chronologicalAge,
+    required this.ageGapYears,
+  });
+
+  final double biologicalAge;
+  final int chronologicalAge;
+  final double? ageGapYears;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Wrap(
+      spacing: 14,
+      runSpacing: 14,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Biological age',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: AppPalette.ink.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              biologicalAge.toStringAsFixed(1),
+              style: theme.textTheme.displaySmall?.copyWith(
+                color: AppPalette.ink,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppPalette.canvas.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Text(
+            '${_ageGapLabel(ageGapYears)} vs calendar age $chronologicalAge',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: _ageGapColor(ageGapYears),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CompassNorthStarPending extends StatelessWidget {
+  const _CompassNorthStarPending({required this.reliablePillarCount});
+
+  final int reliablePillarCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Wrap(
+      spacing: 14,
+      runSpacing: 14,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Biological age',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: AppPalette.ink.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '--',
+              style: theme.textTheme.displaySmall?.copyWith(
+                color: AppPalette.ink,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppPalette.canvas.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Text(
+            '$reliablePillarCount of 6 pillars scored',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: AppPalette.ink,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BiologicalAgeNorthStar extends StatelessWidget {
+  const _BiologicalAgeNorthStar({
+    required this.biologicalAge,
+    required this.chronologicalAge,
+    required this.ageGapYears,
+  });
+
+  final double biologicalAge;
+  final int chronologicalAge;
+  final double? ageGapYears;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ageGapLabel = _ageGapLabel(ageGapYears);
+    final ageGapColor = _ageGapColor(ageGapYears);
+
+    return Wrap(
+      spacing: 18,
+      runSpacing: 18,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'North star',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: biologicalAge.toStringAsFixed(1),
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' biological age',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.88),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        Container(
+          constraints: const BoxConstraints(minWidth: 180),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Calendar age $chronologicalAge',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.82),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                ageGapLabel,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: ageGapColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'This is the single summary number built from the six pillars when enough of them are scored confidently.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.74),
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BiologicalAgePending extends StatelessWidget {
+  const _BiologicalAgePending({required this.reliablePillarCount});
+
+  final int reliablePillarCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'North star',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: Colors.white.withValues(alpha: 0.8),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Biological age is still calibrating.',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          '$reliablePillarCount of 6 pillars are scored confidently. We will show a single biological age once at least 4 pillars are reliable.',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: Colors.white.withValues(alpha: 0.82),
+            height: 1.45,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _MiniBadge extends StatelessWidget {
   const _MiniBadge({
     required this.label,
@@ -2346,6 +2493,35 @@ class _MiniBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+String _ageGapLabel(double? ageGapYears) {
+  if (ageGapYears == null) {
+    return 'Still calibrating';
+  }
+
+  final absoluteGap = ageGapYears.abs();
+  if (absoluteGap < 0.3) {
+    return 'In line with calendar age';
+  }
+
+  final rounded = absoluteGap >= 10
+      ? absoluteGap.toStringAsFixed(0)
+      : absoluteGap.toStringAsFixed(1);
+  return ageGapYears < 0 ? '$rounded years younger' : '$rounded years older';
+}
+
+Color _ageGapColor(double? ageGapYears) {
+  if (ageGapYears == null) {
+    return Colors.white;
+  }
+  if (ageGapYears < -0.3) {
+    return AppPalette.mint;
+  }
+  if (ageGapYears > 0.3) {
+    return AppPalette.coral;
+  }
+  return Colors.white;
 }
 
 class _BadgeAppearance {

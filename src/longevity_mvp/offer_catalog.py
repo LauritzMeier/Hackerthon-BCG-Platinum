@@ -174,21 +174,21 @@ _OFFER_CATALOG = {
         "sort_order": 20,
     },
     "nutrition_coaching": {
-        "offer_label": "Nutrition coaching reset",
+        "offer_label": "Cardiometabolic nutrition coaching",
         "category": "Behavior coaching",
         "offer_type": "coaching",
         "delivery_model": "Coach-led program",
-        "summary": "Start with simple meal tracking so nutrition support becomes personal instead of generic.",
+        "summary": "Build daily food routines that support glucose control, lipid improvement, and cardiac recovery between visits.",
         "why_now_template": (
-            "Nutrition matters here, but this offer makes the most sense once a small amount of real meal logging is in place."
+            "This fits when meals are one of the clearest weekly levers and you want steady coaching, not just one consult."
         ),
         "includes": [
-            "A one-meal-a-day tracking habit to get real signal",
-            "Pattern review around fiber, protein, hydration, and alcohol",
-            "Small changes that fit the current recovery or risk-reduction goal",
+            "Weekly coaching around fiber, protein, hydration, and alcohol choices",
+            "Simple swaps that support both glucose control and cholesterol reduction",
+            "A plan that fits cardiac recovery instead of pushing extreme restriction",
         ],
-        "expected_outcome": "You get a more trustworthy nutrition plan because the app finally sees real eating patterns.",
-        "time_commitment": "A few minutes per day for logging and one short weekly review.",
+        "expected_outcome": "You get nutrition support that is easier to follow consistently and more connected to the real risk picture.",
+        "time_commitment": "Short weekly coaching plus a few minutes of meal awareness most days.",
         "data_used": [
             "survey-level nutrition habits",
             "metabolic risk markers",
@@ -198,30 +198,68 @@ _OFFER_CATALOG = {
             "Meal-by-meal logs would make this meaningfully more tailored.",
         ],
         "first_week": [
-            "Log one meal a day for seven days",
-            "Notice one repeated nutrition drag",
-            "Choose one change instead of trying to fix everything",
+            "Choose one repeatable breakfast or lunch that fits the plan",
+            "Add one reliable fiber or protein upgrade each day",
+            "Track one nutrition trigger instead of trying to fix everything at once",
         ],
         "caution_template": (
             "Use this for personalization and habit support, not as a substitute for clinician advice after an acute event."
         ),
-        "personalization_note": "Useful, but it becomes much stronger after one week of meal tracking.",
+        "personalization_note": "Strong fit when meals are clearly part of the current cardiometabolic problem, even if logging is still light.",
         "cta_label": "Start coaching",
         "active": True,
         "sort_order": 30,
+    },
+    "cardiometabolic_nutrition_consult": {
+        "offer_label": "Cardiometabolic dietitian consult",
+        "category": "Nutrition care",
+        "offer_type": "appointment",
+        "delivery_model": "Dietitian visit",
+        "summary": "Turn recent heart recovery, diabetes, and dyslipidaemia into one practical eating plan you can actually follow.",
+        "why_now_template": (
+            "This is a strong fit when blood sugar, lipid risk, and post-cardiac recovery all need to show up in the same food plan."
+        ),
+        "includes": [
+            "A Mediterranean-style meal structure adapted to glucose and lipid goals",
+            "Guidance on meal timing, fiber, protein, and grocery swaps for recovery",
+            "A short list of meals and snacks that fit medication timing and energy needs",
+        ],
+        "expected_outcome": "You leave with a more clinical nutrition plan than generic coaching alone can provide.",
+        "time_commitment": "One focused consult plus optional follow-up.",
+        "data_used": [
+            "medical record history",
+            "survey-level nutrition habits",
+            "metabolic risk markers",
+            "watch-based energy and activity context",
+        ],
+        "missing_data": [
+            "Meal-by-meal logs would make this meaningfully more tailored.",
+        ],
+        "first_week": [
+            "Pick one breakfast and one lunch you can repeat reliably",
+            "Bring current food struggles and medication timing questions",
+            "Start one fiber-forward change before the consult if it feels realistic",
+        ],
+        "caution_template": (
+            "Use this to support cardiac recovery and diabetes care, not to replace medical follow-up or medication instructions."
+        ),
+        "personalization_note": "Best when the user needs a more clinical food plan than habit coaching alone can provide.",
+        "cta_label": "Book nutrition consult",
+        "active": True,
+        "sort_order": 28,
     },
     "heart_health_supplement_review": {
         "offer_label": "Heart health supplement review",
         "category": "Supplement review",
         "offer_type": "supplement",
         "delivery_model": "Clinician-reviewed add-on",
-        "summary": "Review whether any evidence-backed cardiovascular supplements belong in the plan before adding them on your own.",
+        "summary": "Review whether evidence-backed add-ons such as omega-3, soluble fiber, plant sterols, or CoQ10 belong in the plan before adding them on your own.",
         "why_now_template": (
             "This is only useful after the main clinical plan is clear and should sit behind appointments, rehab, or labs in priority."
         ),
         "includes": [
             "Review of current medications before adding supplements",
-            "Discussion of where options like omega-3 or CoQ10 may or may not fit",
+            "Discussion of where options like omega-3, soluble fiber, plant sterols, or CoQ10 may or may not fit",
             "A simple do-not-start list for products that could conflict with treatment",
         ],
         "expected_outcome": "You avoid random supplement decisions and only consider add-ons that fit the real medical plan.",

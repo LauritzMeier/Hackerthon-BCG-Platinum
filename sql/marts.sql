@@ -373,6 +373,20 @@ FROM (
     SELECT
         patient_id,
         1 AS priority,
+        'cardiology_follow_up_visit' AS offer_code,
+        'Cardiology follow-up visit' AS offer_label,
+        'Recent heart attack or coronary disease context means the clearest next step is a concrete cardiology follow-up.' AS rationale
+    FROM base
+    WHERE icd_codes LIKE '%I21%'
+       OR icd_codes LIKE '%I22%'
+       OR icd_codes LIKE '%I25.1%'
+       OR chronic_conditions LIKE '%coronary_artery_disease%'
+
+    UNION ALL
+
+    SELECT
+        patient_id,
+        2 AS priority,
         'preventive_cardiometabolic_panel' AS offer_code,
         'Preventive cardiometabolic panel' AS offer_label,
         'Elevated blood pressure, cholesterol, or glucose markers justify a broader preventive work-up.' AS rationale
@@ -386,7 +400,41 @@ FROM (
 
     SELECT
         patient_id,
-        2 AS priority,
+        3 AS priority,
+        'cardiac_rehab_intake' AS offer_code,
+        'Cardiac rehab intake' AS offer_label,
+        'After a recent heart event, supervised recovery support can turn low confidence into a safer return-to-activity plan.' AS rationale
+    FROM base
+    WHERE icd_codes LIKE '%I21%'
+       OR icd_codes LIKE '%I22%'
+
+    UNION ALL
+
+    SELECT
+        patient_id,
+        4 AS priority,
+        'cardiometabolic_nutrition_consult' AS offer_code,
+        'Cardiometabolic dietitian consult' AS offer_label,
+        'Diabetes, dyslipidaemia, or post-cardiac recovery creates a strong case for a more clinical nutrition plan.' AS rationale
+    FROM base
+    WHERE (
+        hba1c_pct >= 6.5
+        OR fasting_glucose_mmol >= 7.0
+        OR bmi >= 27
+    )
+      AND (
+        ldl_mmol >= 3.0
+        OR total_cholesterol_mmol >= 5.2
+        OR diet_quality_score <= 6
+        OR icd_codes LIKE '%I21%'
+        OR icd_codes LIKE '%I22%'
+      )
+
+    UNION ALL
+
+    SELECT
+        patient_id,
+        5 AS priority,
         'sleep_recovery_package' AS offer_code,
         'Sleep recovery package' AS offer_label,
         'Recent sleep duration or quality suggests a targeted sleep intervention could be relevant.' AS rationale
@@ -397,20 +445,35 @@ FROM (
 
     SELECT
         patient_id,
-        3 AS priority,
+        6 AS priority,
         'nutrition_coaching' AS offer_code,
-        'Nutrition coaching' AS offer_label,
-        'Diet, weight, or metabolic signals indicate nutrition support could create measurable impact.' AS rationale
+        'Cardiometabolic nutrition coaching' AS offer_label,
+        'Diet, weight, or blood sugar and lipid markers indicate that ongoing nutrition coaching could create measurable impact.' AS rationale
     FROM base
     WHERE diet_quality_score <= 5
        OR bmi >= 27
        OR fasting_glucose_mmol >= 5.6
+       OR hba1c_pct >= 5.7
 
     UNION ALL
 
     SELECT
         patient_id,
-        4 AS priority,
+        7 AS priority,
+        'heart_health_supplement_review' AS offer_code,
+        'Heart health supplement review' AS offer_label,
+        'Supplement choices such as omega-3, soluble fiber, or plant sterols should be matched to cardiac risk and medication context.' AS rationale
+    FROM base
+    WHERE icd_codes LIKE '%I21%'
+       OR icd_codes LIKE '%I22%'
+       OR ldl_mmol >= 3.0
+       OR total_cholesterol_mmol >= 5.2
+
+    UNION ALL
+
+    SELECT
+        patient_id,
+        8 AS priority,
         'movement_program' AS offer_code,
         'Movement and recovery program' AS offer_label,
         'Low activity or low cardiovascular fitness suggests a guided activity plan could improve adherence.' AS rationale

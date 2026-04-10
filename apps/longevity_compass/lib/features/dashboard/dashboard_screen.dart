@@ -78,14 +78,12 @@ class DashboardScreen extends StatelessWidget {
                           ),
                           child: Text(
                             startHere.first,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyLarge
-                                ?.copyWith(
-                                  color: AppPalette.ink,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.4,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                      color: AppPalette.ink,
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.4,
+                                    ),
                           ),
                         ),
                       if (startHere.length > 1) ...[
@@ -131,20 +129,22 @@ class DashboardScreen extends StatelessWidget {
               ] else ...[
                 const ScreenHeader(
                   eyebrow: 'Today',
-                  title: 'One clear focus for this week.',
+                  title: 'Your biological age, and what is shaping it.',
                   subtitle:
-                      'Use just enough data to decide what to do and what to ignore.',
+                      'The longevity compass shows the six pillars behind the number and the one area to work on next.',
                 ),
                 const SizedBox(height: 24),
                 if (experience.compass.peerComparison.hasItems) ...[
                   CompassRadarCard(experience: experience),
                   const SizedBox(height: 24),
+                ] else ...[
+                  CompassHeroCard(experience: experience),
+                  const SizedBox(height: 24),
                 ],
-                CompassHeroCard(experience: experience),
-                const SizedBox(height: 24),
                 SectionSurface(
-                  title: 'Do this next',
-                  subtitle: 'Keep the week small and achievable.',
+                  title: 'What helps most this week',
+                  subtitle:
+                      'These are the few steps most likely to move the number in the right direction.',
                   child: Column(
                     children: [
                       for (var index = 0;
@@ -167,7 +167,9 @@ class DashboardScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(24),
                           ),
                           child: Text(
-                            experience.weeklyPlan.checkInPrompt,
+                            _friendlyCheckInPrompt(
+                              experience.weeklyPlan.checkInPrompt,
+                            ),
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium
@@ -184,9 +186,9 @@ class DashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 SectionSurface(
-                  title: 'Why this is the plan',
+                  title: 'What is shaping it right now',
                   subtitle:
-                      'Every recommendation should be explainable from real data.',
+                      'A short view of the care context and connected signals behind the compass.',
                   child: Column(
                     children: [
                       _PlanEvidenceRow(
@@ -210,7 +212,8 @@ class DashboardScreen extends StatelessWidget {
                             : missingSignals.first,
                         accent: AppPalette.sand.withValues(alpha: 0.88),
                       ),
-                      if (experience.careContext.medicalGuardrail.isNotEmpty) ...[
+                      if (experience
+                          .careContext.medicalGuardrail.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Container(
                           width: double.infinity,
@@ -387,17 +390,15 @@ class _WelcomeSourcesCard extends StatelessWidget {
           const SizedBox(height: 16),
           _BulletList(
             title: 'What is already moving',
-            items: bookings
-                .map((booking) {
-                  final practical = practicalInfoForOfferCode(
-                    booking.offerCode,
-                    fallbackTitle: booking.offerLabel,
-                    fallbackFormat: booking.deliveryModel,
-                    offerType: booking.offerType,
-                  );
-                  return '${practical.title} is booked for ${booking.scheduledLabel}.';
-                })
-                .toList(growable: false),
+            items: bookings.map((booking) {
+              final practical = practicalInfoForOfferCode(
+                booking.offerCode,
+                fallbackTitle: booking.offerLabel,
+                fallbackFormat: booking.deliveryModel,
+                offerType: booking.offerType,
+              );
+              return '${practical.title} is booked for ${booking.scheduledLabel}.';
+            }).toList(growable: false),
           ),
         ],
       ],
@@ -531,6 +532,19 @@ class _BulletList extends StatelessWidget {
       ],
     );
   }
+}
+
+String _friendlyCheckInPrompt(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return '';
+  }
+
+  if (trimmed.startsWith('Ask the coach to adapt')) {
+    return 'If your week looks different than usual, ask the coach to tailor this plan to your schedule.';
+  }
+
+  return trimmed;
 }
 
 String _firstSentence(String value) {

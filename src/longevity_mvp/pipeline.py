@@ -21,7 +21,13 @@ def _load_raw_table(connection, table_name: str, csv_path: Path) -> None:
         CREATE SCHEMA IF NOT EXISTS raw;
         CREATE OR REPLACE TABLE raw.{table_name} AS
         SELECT *
-        FROM read_csv_auto('{safe_path}', HEADER = TRUE, SAMPLE_SIZE = -1);
+        FROM read_csv_auto(
+            '{safe_path}',
+            HEADER = TRUE,
+            DELIM = ',',
+            SAMPLE_SIZE = -1,
+            STRICT_MODE = FALSE
+        );
         """
     )
 
