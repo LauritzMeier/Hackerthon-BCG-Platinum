@@ -286,6 +286,44 @@ def _pick(options: List[str]) -> str:
     return random.choice(options)
 
 
+def _normalize_copy(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", text.lower())).strip()
+
+
+def _offer_fit_line(
+    persona_context: Dict[str, Any] | None,
+    focus_name: str | None = None,
+) -> str | None:
+    if not persona_context and not focus_name:
+        return None
+
+    motivation = ""
+    if persona_context:
+        motivation = str(persona_context.get("main_motivation") or "").strip()
+
+    if motivation and focus_name:
+        return f"It fits your goal to {motivation}, with {focus_name} as the main focus."
+    if motivation:
+        return f"It fits your goal to {motivation}."
+    if focus_name:
+        return f"It directly supports your current focus: {focus_name}."
+    return None
+
+
+def _offer_personalization_line(note: str) -> str:
+    clean = str(note or "").strip()
+    if not clean:
+        return ""
+    lower = clean.lower()
+    if lower.startswith("best when "):
+        return f"It works best when {clean[len('Best when '):]}"
+    if lower.startswith("good when "):
+        return f"It works well when {clean[len('Good when '):]}"
+    if lower.startswith("most valuable when "):
+        return f"It is most valuable when {clean[len('Most valuable when '):]}"
+    return clean
+
+
 def opening_ack(message: str) -> str:
     """Light mirror of the user's ask — avoids identical 'You asked:' every time."""
     short = message.strip()
@@ -455,38 +493,31 @@ def compose_priority_sections(
 
 def firebase_context_line(summary: str) -> str:
     if not summary or summary.startswith("No patient"):
-        return _pick(
-            [
-                "I don't have rich Firestore context for you yet, so I'm leaning on the curated warehouse signals.",
-                "Firestore is thin or empty for this id — I'm still grounding this in the structured health records we loaded.",
-            ]
+        return (
+            "I don't have much extra profile context yet, so this is based mostly on the structured health records we loaded."
         )
-    return _pick(
-        [
-            f"Behind the scenes: {summary}",
-            f"For transparency on sources — {summary.lower()[0]}{summary[1:]}"
-            if len(summary) > 1
-            else f"For transparency on sources — {summary}",
-            f"Context sync: {summary}",
-        ]
-    )
+    if summary.startswith("Firestore context unavailable"):
+        return (
+            "Extra app context was unavailable for this response, so I relied on the main structured health records."
+        )
+    if summary.startswith("Found data in:"):
+        return "I also used the profile context already linked in the app."
+
+    focus_match = re.search(r"primary focus:\s*([^.]+)", summary, flags=re.IGNORECASE)
+    if focus_match:
+        focus_name = focus_match.group(1).strip()
+        return f"I also used the app context already linked to your account, including your current focus on {focus_name}."
+
+    if summary.startswith("Loaded overview context"):
+        return "I also used the extra context already linked to your account in the app."
+
+    return f"I also used synced profile context: {summary}"
 
 
 def safety_footers() -> List[str]:
     return [
-        _pick(
-            [
-                "I'm coaching from lifestyle and record data — not diagnosing or replacing your clinician.",
-                "Think of this as wellness coaching, not a medical opinion; flag anything worrying with your doctor.",
-                "This is supportive guidance from your records, not a diagnosis or emergency triage.",
-            ]
-        ),
-        _pick(
-            [
-                "If numbers look off or you feel unwell, that's a clinician conversation, not something to 'optimize' in chat.",
-                "When in doubt about symptoms or meds, your care team wins over any app summary.",
-            ]
-        ),
+        "This is coaching based on your records, not a diagnosis or a replacement for your clinician.",
+        "If you feel unwell, have new symptoms, or think the numbers are off, please check with your care team.",
     ]
 
 
@@ -616,46 +647,32 @@ def compose_offer_recommendation_sections(
     why_now = offer.get("why_now") or offer.get("rationale") or "It fits the current pattern in your records."
     personalization = offer.get("personalization_note") or ""
     missing_data = offer.get("missing_data") or []
-    focus_name = (primary_focus or {}).get("pillar_name") or label
+    focus_name = (primary_focus or {}).get("pillar_name")
 
-    sections = [
-        _pick(
-            [
-                f"The support option I'd put first right now is {label}.",
-                f"If you want one concrete support step, I'd point to {label}.",
-            ]
-        ),
-        persona_style_line(persona_context),
-        _pick(
-            [
-                f"{summary} The main reason now is simple: {why_now}",
-                f"Why this one: {summary} More specifically, {why_now}",
-            ]
-        ),
-        persona_alignment_line(persona_context, focus_name),
-    ]
+    sections = [f"I recommend {label} as the first support option to consider."]
+
+    fit_line = _offer_fit_line(persona_context, focus_name)
+    if fit_line:
+        sections.append(fit_line)
+
+    sections.append(f"Why it fits: {summary}")
+    if _normalize_copy(summary) != _normalize_copy(why_now):
+        sections.append(f"Why now: {why_now}")
 
     if personalization:
-        sections.append(personalization)
+        sections.append(_offer_personalization_line(personalization))
 
     if existing_booking:
         sections.append(
-            f"You already have this booked for {existing_booking.get('scheduled_label') or 'a saved slot'}, so I would treat that as your active next step."
+            f"You already have it booked for {existing_booking.get('scheduled_label') or 'a saved slot'}, so that is your active next step."
         )
     elif scheduled_label:
         sections.append(
-            f"If you want, I can book the first available demo slot for you automatically: {scheduled_label}. Just say 'book it'."
+            f"If you want me to book it, the first available slot is {scheduled_label}. Just say 'book it'."
         )
 
     if missing_data:
-        sections.append(
-            _pick(
-                [
-                    f"To make it even sharper, {missing_data[0]}",
-                    f"One thing that would personalize this more: {missing_data[0]}",
-                ]
-            )
-        )
+        sections.append(f"To personalize this further: {missing_data[0]}")
 
     return sections
 
@@ -671,30 +688,14 @@ def compose_offer_booking_sections(
     first_week = offer.get("first_week") or []
 
     sections = [
-        _pick(
-            [
-                f"I've booked {label} for {scheduled_label}.",
-                f"{label} is now booked for {scheduled_label}.",
-            ]
-        ),
-        _pick(
-            [
-                "I saved it to your support bookings, so it should show up alongside the other booked next steps.",
-                "That booking is now saved in your support bookings, not just mentioned in chat.",
-            ]
-        ),
-        next_step_frame(persona_context),
+        f"I've booked {label} for {scheduled_label}.",
+        "It is now saved in your support bookings.",
     ]
 
     if first_week:
-        sections.append(
-            _pick(
-                [
-                    f"Before then, start with this: {first_week[0]}",
-                    f"The best thing to do before that slot is simple: {first_week[0]}",
-                ]
-            )
-        )
+        sections.append(f"Before then, start with this: {first_week[0]}")
+    else:
+        sections.append(next_step_frame(persona_context))
     return sections
 
 
