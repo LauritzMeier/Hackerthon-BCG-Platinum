@@ -378,9 +378,7 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
       orElse: () => widget.experience.compass.pillars.first,
     );
     final differenceAppearance = selectedComparison.hasEnoughData
-        ? (selectedComparison.difference >= 0
-            ? _appearanceForDirection('improving')
-            : _appearanceForDirection('drifting'))
+        ? _appearanceForPeerDifference(selectedComparison.difference)
         : _appearanceForDataConfidence(selectedComparison.scoreConfidence);
     final trendAppearance = _appearanceForDirection(selectedPillar.trend);
 
@@ -499,6 +497,8 @@ class _CompassRadarCardState extends State<CompassRadarCard> {
                     height: 1.4,
                   ),
                 ),
+                const SizedBox(height: 16),
+                _PillarTransparencyPanel(pillar: selectedPillar),
               ],
             ),
           ),
@@ -882,6 +882,206 @@ class _CompassRadarPainter extends CustomPainter {
   bool shouldRepaint(covariant _CompassRadarPainter oldDelegate) {
     return oldDelegate.selectedPillarId != selectedPillarId ||
         oldDelegate.items != items;
+  }
+}
+
+enum _SignalTone { positive, warning, neutral }
+
+class _SignalInsight {
+  const _SignalInsight({
+    required this.label,
+    required this.value,
+    required this.note,
+    required this.tag,
+    required this.tone,
+  });
+
+  final String label;
+  final String value;
+  final String note;
+  final String tag;
+  final _SignalTone tone;
+}
+
+class _PillarTransparencyPanel extends StatelessWidget {
+  const _PillarTransparencyPanel({required this.pillar});
+
+  final PillarSnapshot pillar;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final sourceSummary = _pillarSourceSummary(pillar);
+    final insights = _signalInsightsForPillar(pillar);
+    final confidenceAppearance = _appearanceForConfidence(pillar);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppPalette.canvas.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppPalette.ink.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'How this score is built',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: AppPalette.ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _MiniBadge(
+                label: confidenceAppearance.label,
+                background: confidenceAppearance.background,
+                foreground: confidenceAppearance.foreground,
+              ),
+              _MiniBadge(
+                label: _pillarCalculationFrame(pillar),
+                background: AppPalette.sand.withValues(alpha: 0.9),
+                foreground: AppPalette.ink,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _pillarCalculationSummary(pillar),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppPalette.ink.withValues(alpha: 0.8),
+              height: 1.4,
+            ),
+          ),
+          if (pillar.whyItMatters.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              pillar.whyItMatters,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppPalette.ink.withValues(alpha: 0.72),
+                height: 1.45,
+              ),
+            ),
+          ],
+          if (sourceSummary.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Data used: $sourceSummary',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppPalette.ink.withValues(alpha: 0.64),
+                fontWeight: FontWeight.w700,
+                height: 1.4,
+              ),
+            ),
+          ],
+          if (insights.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            for (var index = 0; index < insights.length; index++) ...[
+              _SignalInsightRow(insight: insights[index]),
+              if (index < insights.length - 1) const SizedBox(height: 10),
+            ],
+          ] else ...[
+            const SizedBox(height: 14),
+            Text(
+              'This pillar is still waiting for enough connected detail to show a deeper breakdown.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppPalette.ink.withValues(alpha: 0.66),
+                height: 1.4,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Text(
+            _pillarTrendSummary(pillar),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppPalette.ink.withValues(alpha: 0.62),
+              fontWeight: FontWeight.w700,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SignalInsightRow extends StatelessWidget {
+  const _SignalInsightRow({required this.insight});
+
+  final _SignalInsight insight;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final appearance = _appearanceForSignalTone(insight.tone);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: appearance.background.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: appearance.background.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  insight.label,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: AppPalette.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  insight.value,
+                  textAlign: TextAlign.right,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: AppPalette.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _MiniBadge(
+                label: insight.tag,
+                background: appearance.background,
+                foreground: appearance.foreground,
+              ),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Text(
+                  insight.note,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppPalette.ink.withValues(alpha: 0.74),
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -2075,6 +2275,755 @@ String _selectedPillarMetricLine(PeerComparisonItem item) {
   return 'You $youValue  •  Age group ${item.peerScoreLabel}';
 }
 
+_BadgeAppearance _appearanceForConfidence(PillarSnapshot pillar) {
+  if (!pillar.hasEnoughData || pillar.scoreConfidence == 'low') {
+    return const _BadgeAppearance(
+      label: 'Estimate only',
+      background: Color(0xFFE7E1D8),
+      foreground: AppPalette.ink,
+      icon: Icons.question_mark_rounded,
+    );
+  }
+  if (pillar.scoreConfidence == 'medium') {
+    return const _BadgeAppearance(
+      label: 'Medium confidence',
+      background: Color(0xFFF3E2C6),
+      foreground: AppPalette.amber,
+      icon: Icons.tune_rounded,
+    );
+  }
+  return const _BadgeAppearance(
+    label: 'High confidence',
+    background: Color(0xFFDDF0E3),
+    foreground: AppPalette.forest,
+    icon: Icons.verified_rounded,
+  );
+}
+
+_BadgeAppearance _appearanceForSignalTone(_SignalTone tone) {
+  switch (tone) {
+    case _SignalTone.positive:
+      return const _BadgeAppearance(
+        label: 'Helps',
+        background: Color(0xFFDDF0E3),
+        foreground: AppPalette.forest,
+        icon: Icons.arrow_upward_rounded,
+      );
+    case _SignalTone.warning:
+      return const _BadgeAppearance(
+        label: 'Pressure',
+        background: Color(0xFFF8DDD7),
+        foreground: AppPalette.coral,
+        icon: Icons.arrow_downward_rounded,
+      );
+    case _SignalTone.neutral:
+      return const _BadgeAppearance(
+        label: 'Context',
+        background: Color(0xFFF3E2C6),
+        foreground: AppPalette.amber,
+        icon: Icons.remove_rounded,
+      );
+  }
+}
+
+String _pillarCalculationFrame(PillarSnapshot pillar) {
+  switch (pillar.id) {
+    case 'sleep_recovery':
+      return '30d score • recent trend';
+    case 'cardiovascular_health':
+      return 'risk + recovery blend';
+    case 'metabolic_health':
+      return 'lab-driven estimate';
+    case 'movement_fitness':
+      return '30d volume • 7d trend';
+    case 'nutrition_quality':
+      return 'habit score';
+    case 'mental_resilience':
+      return 'survey-led estimate';
+    default:
+      return 'Composite score';
+  }
+}
+
+String _pillarCalculationSummary(PillarSnapshot pillar) {
+  switch (pillar.id) {
+    case 'sleep_recovery':
+      return 'Sleep uses your 30-day sleep quality and duration as the main score, while deep sleep and the last 7 days explain whether recovery is drifting or stabilizing.';
+    case 'cardiovascular_health':
+      return 'Cardiovascular health blends resting heart rate, HRV, blood pressure, LDL, walking volume, and cardiac history. Recent acute heart events can cap the score during recovery.';
+    case 'metabolic_health':
+      return 'Metabolic health is mostly driven by labs and body composition, especially HbA1c, fasting glucose, LDL, triglycerides, and BMI.';
+    case 'movement_fitness':
+      return 'Movement combines your 30-day steps, active minutes, and exercise frequency. The trend checks whether the last 7 days are moving above or below that baseline.';
+    case 'nutrition_quality':
+      return 'Nutrition quality combines diet quality, fruit and veg intake, hydration, and alcohol load, with inflammation acting as supporting context.';
+    case 'mental_resilience':
+      return 'Mental resilience combines perceived stress, WHO-5 wellbeing, self-rated health, and sleep satisfaction to estimate how sustainable your current routine feels.';
+    default:
+      return 'This pillar combines several connected inputs rather than using a single metric.';
+  }
+}
+
+String _pillarTrendSummary(PillarSnapshot pillar) {
+  switch (pillar.id) {
+    case 'sleep_recovery':
+      return 'Trend checks whether the last 7 days of sleep are better or worse than the 30-day baseline.';
+    case 'cardiovascular_health':
+      return 'Trend compares recent resting heart rate and HRV with the 30-day baseline. Recent cardiac events can keep the trend cautious even if wearables briefly look steadier.';
+    case 'movement_fitness':
+      return 'Trend compares the last 7 days of steps and active minutes with the 30-day baseline.';
+    case 'metabolic_health':
+      return 'Metabolic trend moves more slowly and usually changes when new labs or meaningful coaching updates arrive.';
+    case 'nutrition_quality':
+      return 'Nutrition trend depends more on survey and coach updates than passive wearable data, so it changes less often.';
+    case 'mental_resilience':
+      return 'Mental resilience trend reflects stress, wellbeing, and recovery context rather than one live sensor.';
+    default:
+      return 'Trend compares the latest connected signal with the broader baseline available for this pillar.';
+  }
+}
+
+String _pillarSourceSummary(PillarSnapshot pillar) {
+  final labels = pillar.dataSources
+      .map(_friendlyDataSourceLabel)
+      .where((label) => label.isNotEmpty)
+      .toSet()
+      .toList(growable: false);
+  if (labels.isNotEmpty) {
+    return labels.join(' + ');
+  }
+
+  switch (pillar.id) {
+    case 'sleep_recovery':
+      return 'wearable sleep trends';
+    case 'cardiovascular_health':
+      return 'wearable recovery + clinical cardio markers';
+    case 'metabolic_health':
+      return 'labs + clinical baseline';
+    case 'movement_fitness':
+      return 'wearable activity + exercise history';
+    case 'nutrition_quality':
+      return 'survey nutrition habits + inflammation context';
+    case 'mental_resilience':
+      return 'survey wellbeing + recovery context';
+    default:
+      return '';
+  }
+}
+
+String _friendlyDataSourceLabel(String raw) {
+  switch (raw) {
+    case 'curated.patient_metrics':
+      return 'wearable trends';
+    case 'curated.patient_profile':
+      return 'clinical and survey baseline';
+    case 'patient_reported_chat_updates':
+      return 'coach updates';
+    default:
+      return raw.replaceAll('_', ' ');
+  }
+}
+
+dynamic _firstSignalValue(Map<String, dynamic> signals, List<String> keys) {
+  for (final key in keys) {
+    if (!signals.containsKey(key)) {
+      continue;
+    }
+    final value = signals[key];
+    if (value == null) {
+      continue;
+    }
+    if (value is String && value.trim().isEmpty) {
+      continue;
+    }
+    return value;
+  }
+  return null;
+}
+
+double? _signalNumber(Map<String, dynamic> signals, List<String> keys) {
+  final value = _firstSignalValue(signals, keys);
+  if (value == null) {
+    return null;
+  }
+  if (value is num) {
+    return value.toDouble();
+  }
+  return double.tryParse(value.toString());
+}
+
+String _formatSignalNumber(
+  double value, {
+  int digits = 0,
+  String suffix = '',
+}) {
+  final roundedValue = digits == 0 ? value.roundToDouble() : value;
+  final label = digits == 0
+      ? roundedValue.toStringAsFixed(0)
+      : roundedValue.toStringAsFixed(digits);
+  return '$label$suffix';
+}
+
+List<_SignalInsight> _signalInsightsForPillar(PillarSnapshot pillar) {
+  final signals = pillar.keySignals;
+  final insights = <_SignalInsight>[];
+
+  switch (pillar.id) {
+    case 'sleep_recovery':
+      final quality30 = _signalNumber(signals, ['sleep_quality_30d_avg']);
+      if (quality30 != null) {
+        final tone = quality30 >= 80
+            ? _SignalTone.positive
+            : (quality30 >= 70 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: '30-day sleep quality',
+            value: '${_formatSignalNumber(quality30)}/100',
+            note: quality30 >= 80
+                ? 'Sleep quality is consistently strong and helping recovery.'
+                : (quality30 >= 70
+                    ? 'Quality is acceptable but not yet fully restorative.'
+                    : 'Quality is too low to support strong recovery.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Steady'),
+            tone: tone,
+          ),
+        );
+      }
+      final duration30 = _signalNumber(
+        signals,
+        ['sleep_duration_30d_avg', 'sleep_duration_30d_avg_hrs'],
+      );
+      if (duration30 != null) {
+        final tone = duration30 >= 7.0 && duration30 <= 8.5
+            ? _SignalTone.positive
+            : (duration30 >= 6.0 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: '30-day sleep duration',
+            value: '${_formatSignalNumber(duration30, digits: 1)} h',
+            note: duration30 >= 7.0 && duration30 <= 8.5
+                ? 'Sleep duration is in the zone the score wants to see.'
+                : (duration30 >= 6.0
+                    ? 'Duration is a little short, so the score stays cautious.'
+                    : 'Short sleep is a major drag on this pillar.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Steady'),
+            tone: tone,
+          ),
+        );
+      }
+      final deepSleep = _signalNumber(signals, ['deep_sleep_30d_avg_pct']);
+      if (deepSleep != null) {
+        final tone = deepSleep >= 20
+            ? _SignalTone.positive
+            : (deepSleep >= 16 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: '30-day deep sleep share',
+            value: '${_formatSignalNumber(deepSleep, digits: 1)}%',
+            note: deepSleep >= 20
+                ? 'Restorative sleep is showing up often enough to help the score.'
+                : (deepSleep >= 16
+                    ? 'Deep sleep is present but not especially strong.'
+                    : 'Low deep sleep makes the recovery picture weaker.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      break;
+    case 'cardiovascular_health':
+      final recentEventDays = _signalNumber(
+        signals,
+        ['recent_acute_cardiac_event_days_ago'],
+      );
+      if (recentEventDays != null) {
+        insights.add(
+          _SignalInsight(
+            label: 'Recent acute cardiac event',
+            value: '${_formatSignalNumber(recentEventDays)} days ago',
+            note: recentEventDays <= 30
+                ? 'A very recent event keeps the score capped during recovery.'
+                : 'A recent event still keeps the score conservative.',
+            tag: 'Pressure',
+            tone: _SignalTone.warning,
+          ),
+        );
+      }
+      final restingHr = _signalNumber(signals, ['resting_hr_30d_avg']);
+      if (restingHr != null) {
+        final tone = restingHr <= 65
+            ? _SignalTone.positive
+            : (restingHr <= 75 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: '30-day resting heart rate',
+            value: '${_formatSignalNumber(restingHr)} bpm',
+            note: restingHr <= 65
+                ? 'Resting heart rate is supporting resilience.'
+                : (restingHr <= 75
+                    ? 'Resting heart rate is acceptable but not ideal.'
+                    : 'Resting heart rate is high for a strong cardio score.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Steady'),
+            tone: tone,
+          ),
+        );
+      }
+      final hrv = _signalNumber(signals, ['hrv_30d_avg']);
+      if (hrv != null) {
+        final tone = hrv >= 35
+            ? _SignalTone.positive
+            : (hrv >= 28 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: '30-day HRV',
+            value: '${_formatSignalNumber(hrv, digits: 1)} ms',
+            note: hrv >= 35
+                ? 'HRV is helping the recovery side of the score.'
+                : (hrv >= 28
+                    ? 'HRV is workable but not especially strong.'
+                    : 'Lower HRV keeps the score under pressure.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Steady'),
+            tone: tone,
+          ),
+        );
+      }
+      final sbp = _signalNumber(signals, ['sbp_mmhg']);
+      final dbp = _signalNumber(signals, ['dbp_mmhg']);
+      if (sbp != null || dbp != null) {
+        final tone = (sbp != null && sbp < 120) && (dbp != null && dbp < 80)
+            ? _SignalTone.positive
+            : ((sbp != null && sbp < 130) && (dbp != null && dbp < 80)
+                ? _SignalTone.neutral
+                : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'Blood pressure',
+            value:
+                '${sbp != null ? _formatSignalNumber(sbp) : '?'} / ${dbp != null ? _formatSignalNumber(dbp) : '?'} mmHg',
+            note: tone == _SignalTone.positive
+                ? 'Blood pressure is at goal and helping the score.'
+                : (tone == _SignalTone.warning
+                    ? 'Blood pressure is above the ideal cardio range.'
+                    : 'Blood pressure is close to target but not fully there.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Steady'),
+            tone: tone,
+          ),
+        );
+      }
+      final ldl = _signalNumber(signals, ['ldl_mmol']);
+      final ldlTarget = _signalNumber(
+        signals,
+        ['secondary_prevention_ldl_target_mmol'],
+      );
+      if (ldl != null) {
+        final target = ldlTarget ?? 2.6;
+        final tone = ldl <= target
+            ? _SignalTone.positive
+            : (ldl <= target + 0.7 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'LDL cholesterol',
+            value: '${_formatSignalNumber(ldl, digits: 2)} mmol/L',
+            note: ldl <= target
+                ? 'LDL is at or below the current target.'
+                : (ldl <= target + 0.7
+                    ? 'LDL is still above target, keeping the score cautious.'
+                    : 'LDL is well above target and materially drags the score down.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      break;
+    case 'metabolic_health':
+      final hba1c = _signalNumber(signals, ['hba1c_pct']);
+      if (hba1c != null) {
+        final tone = hba1c < 5.7
+            ? _SignalTone.positive
+            : (hba1c < 6.5 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'HbA1c',
+            value: '${_formatSignalNumber(hba1c, digits: 1)}%',
+            note: hba1c < 5.7
+                ? 'HbA1c is in range and helping the score.'
+                : (hba1c < 6.5
+                    ? 'HbA1c is elevated, so the score stays cautious.'
+                    : 'HbA1c is in the diabetic range and strongly lowers the score.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      final glucose = _signalNumber(signals, ['fasting_glucose_mmol']);
+      if (glucose != null) {
+        final tone = glucose < 5.6
+            ? _SignalTone.positive
+            : (glucose < 7.0 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'Fasting glucose',
+            value: '${_formatSignalNumber(glucose, digits: 1)} mmol/L',
+            note: glucose < 5.6
+                ? 'Fasting glucose is supporting a stronger metabolic score.'
+                : (glucose < 7.0
+                    ? 'Fasting glucose is above ideal and keeps the score cautious.'
+                    : 'Fasting glucose is high and meaningfully lowers the score.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      final bmi = _signalNumber(signals, ['bmi']);
+      if (bmi != null) {
+        final tone = bmi < 25
+            ? _SignalTone.positive
+            : (bmi < 30 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'BMI',
+            value: _formatSignalNumber(bmi, digits: 1),
+            note: bmi < 25
+                ? 'Body composition is helping the metabolic score.'
+                : (bmi < 30
+                    ? 'BMI adds some pressure but is not the main issue.'
+                    : 'BMI is high enough to materially drag the score down.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      final ldl = _signalNumber(signals, ['ldl_mmol']);
+      if (ldl != null) {
+        final tone = ldl <= 2.6
+            ? _SignalTone.positive
+            : (ldl <= 3.4 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'LDL cholesterol',
+            value: '${_formatSignalNumber(ldl, digits: 2)} mmol/L',
+            note: ldl <= 2.6
+                ? 'LDL is in a range that supports a stronger metabolic score.'
+                : (ldl <= 3.4
+                    ? 'LDL is above ideal and keeps the score from rising.'
+                    : 'LDL is high enough to meaningfully lower this pillar.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      break;
+    case 'movement_fitness':
+      final steps30 = _signalNumber(signals, ['steps_30d_avg']);
+      if (steps30 != null) {
+        final tone = steps30 >= 9000
+            ? _SignalTone.positive
+            : (steps30 >= 7000 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: '30-day daily steps',
+            value: _formatSignalNumber(steps30),
+            note: steps30 >= 9000
+                ? 'Step volume is strong and lifting the score.'
+                : (steps30 >= 7000
+                    ? 'Step volume is decent but not yet a strong advantage.'
+                    : 'Daily movement volume is below the target range.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Steady'),
+            tone: tone,
+          ),
+        );
+      }
+      final active30 = _signalNumber(signals, ['active_minutes_30d_avg']);
+      if (active30 != null) {
+        final tone = active30 >= 45
+            ? _SignalTone.positive
+            : (active30 >= 25 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: '30-day active minutes',
+            value: '${_formatSignalNumber(active30)} min/day',
+            note: active30 >= 45
+                ? 'Active minutes are high enough to help the score clearly.'
+                : (active30 >= 25
+                    ? 'Activity is building but still short of a strong baseline.'
+                    : 'Moderate-to-vigorous activity is too low for a strong score.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Steady'),
+            tone: tone,
+          ),
+        );
+      }
+      final exercise = _signalNumber(signals, ['exercise_sessions_weekly']);
+      if (exercise != null) {
+        final tone = exercise >= 4
+            ? _SignalTone.positive
+            : (exercise >= 2 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'Exercise sessions per week',
+            value: _formatSignalNumber(exercise, digits: 1),
+            note: exercise >= 4
+                ? 'Weekly exercise structure is helping this pillar.'
+                : (exercise >= 2
+                    ? 'There is some structure, but not enough to drive a strong score.'
+                    : 'Too few dedicated sessions are showing up each week.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      final sedentary = _signalNumber(signals, ['sedentary_hrs_day']);
+      if (sedentary != null) {
+        final tone = sedentary <= 6
+            ? _SignalTone.positive
+            : (sedentary <= 8 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'Sedentary time',
+            value: '${_formatSignalNumber(sedentary, digits: 1)} h/day',
+            note: sedentary <= 6
+                ? 'Sitting time is low enough to help movement quality.'
+                : (sedentary <= 8
+                    ? 'Sedentary time is manageable but still worth tightening.'
+                    : 'Long sitting time is dragging the score down.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      break;
+    case 'nutrition_quality':
+      final diet = _signalNumber(signals, ['diet_quality_score']);
+      if (diet != null) {
+        final tone = diet >= 7
+            ? _SignalTone.positive
+            : (diet >= 5 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'Diet quality',
+            value: '${_formatSignalNumber(diet, digits: 1)}/10',
+            note: diet >= 7
+                ? 'Diet quality is supporting the score.'
+                : (diet >= 5
+                    ? 'Diet quality looks mixed, so the score stays cautious.'
+                    : 'Diet quality is low enough to pull this pillar down.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      final fruitVeg = _signalNumber(signals, ['fruit_veg_servings_daily']);
+      if (fruitVeg != null) {
+        final tone = fruitVeg >= 5
+            ? _SignalTone.positive
+            : (fruitVeg >= 3 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'Fruit and veg',
+            value: '${_formatSignalNumber(fruitVeg, digits: 1)} servings/day',
+            note: fruitVeg >= 5
+                ? 'Plant intake is in the target range.'
+                : (fruitVeg >= 3
+                    ? 'Plant intake is improving but still below target.'
+                    : 'Plant intake is low for a stronger nutrition score.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      final water = _signalNumber(signals, ['water_glasses_daily']);
+      if (water != null) {
+        final tone = water >= 8
+            ? _SignalTone.positive
+            : (water >= 6 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'Hydration',
+            value: '${_formatSignalNumber(water)} glasses/day',
+            note: water >= 8
+                ? 'Hydration is supporting the score.'
+                : (water >= 6
+                    ? 'Hydration is okay but not yet ideal.'
+                    : 'Hydration looks light for a stronger nutrition score.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      final alcohol = _signalNumber(
+        signals,
+        ['alcohol_units_weekly', 'current_alcohol_units_weekly'],
+      );
+      if (alcohol != null) {
+        final tone = alcohol <= 10
+            ? _SignalTone.positive
+            : (alcohol <= 14 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'Alcohol load',
+            value: '${_formatSignalNumber(alcohol, digits: 1)} units/week',
+            note: alcohol <= 10
+                ? 'Alcohol is not adding much pressure to the score.'
+                : (alcohol <= 14
+                    ? 'Alcohol is slightly above the cleaner baseline for this pillar.'
+                    : 'Alcohol load is high enough to drag the score down.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      break;
+    case 'mental_resilience':
+      final stress = _signalNumber(signals, ['stress_level']);
+      if (stress != null) {
+        final tone = stress <= 4
+            ? _SignalTone.positive
+            : (stress <= 6 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'Stress level',
+            value: '${_formatSignalNumber(stress, digits: 1)}/10',
+            note: stress <= 4
+                ? 'Stress looks manageable and helps resilience.'
+                : (stress <= 6
+                    ? 'Stress is elevated enough to keep the score cautious.'
+                    : 'High stress is a major drag on this pillar.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      final wellbeing = _signalNumber(signals, ['mental_wellbeing_who5']);
+      if (wellbeing != null) {
+        final tone = wellbeing >= 18
+            ? _SignalTone.positive
+            : (wellbeing >= 13 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'WHO-5 wellbeing',
+            value: '${_formatSignalNumber(wellbeing)}/25',
+            note: wellbeing >= 18
+                ? 'Wellbeing is in a range that supports resilience.'
+                : (wellbeing >= 13
+                    ? 'Wellbeing looks mixed, so the score stays cautious.'
+                    : 'Low wellbeing is pulling the score down.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      final selfRated = _signalNumber(signals, ['self_rated_health']);
+      if (selfRated != null) {
+        final tone = selfRated >= 4
+            ? _SignalTone.positive
+            : (selfRated >= 3 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'Self-rated health',
+            value: '${_formatSignalNumber(selfRated, digits: 1)}/5',
+            note: selfRated >= 4
+                ? 'You currently perceive your health as supportive.'
+                : (selfRated >= 3
+                    ? 'Your self-rating is middling, which keeps this pillar cautious.'
+                    : 'Low self-rated health is a strong warning sign for this pillar.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      final sleepSat = _signalNumber(signals, ['sleep_satisfaction']);
+      if (sleepSat != null) {
+        final tone = sleepSat >= 5
+            ? _SignalTone.positive
+            : (sleepSat >= 4 ? _SignalTone.neutral : _SignalTone.warning);
+        insights.add(
+          _SignalInsight(
+            label: 'Sleep satisfaction',
+            value: '${_formatSignalNumber(sleepSat, digits: 1)}/7',
+            note: sleepSat >= 5
+                ? 'Sleep satisfaction is reinforcing resilience.'
+                : (sleepSat >= 4
+                    ? 'Sleep feels mixed, so this pillar stays watchful.'
+                    : 'Poor sleep satisfaction is pulling resilience down.'),
+            tag: tone == _SignalTone.positive
+                ? 'Helps'
+                : (tone == _SignalTone.warning ? 'Pressure' : 'Context'),
+            tone: tone,
+          ),
+        );
+      }
+      break;
+  }
+
+  if (insights.isNotEmpty) {
+    return insights;
+  }
+
+  return signals.entries.take(4).map((entry) {
+    return _SignalInsight(
+      label: _prettifySignalKey(entry.key),
+      value: entry.value is num
+          ? _formatSignalNumber((entry.value as num).toDouble(), digits: 1)
+          : entry.value.toString(),
+      note: 'This signal is part of the context behind the current score.',
+      tag: 'Context',
+      tone: _SignalTone.neutral,
+    );
+  }).toList(growable: false);
+}
+
+String _prettifySignalKey(String key) {
+  return key
+      .replaceAll('_', ' ')
+      .replaceAll('avg', 'avg.')
+      .replaceAll('mmhg', 'mmHg')
+      .replaceAll('pct', '%')
+      .trim();
+}
+
 _BadgeAppearance _appearanceForDataConfidence(String raw) {
   switch (raw) {
     case 'medium':
@@ -2164,6 +3113,31 @@ _BadgeAppearance _appearanceForDirection(String raw) {
         icon: Icons.priority_high_rounded,
       );
   }
+}
+
+_BadgeAppearance _appearanceForPeerDifference(double difference) {
+  if (difference.abs() < 2) {
+    return const _BadgeAppearance(
+      label: 'In line with peers',
+      background: Color(0xFFE7E1D8),
+      foreground: AppPalette.ink,
+      icon: Icons.horizontal_rule_rounded,
+    );
+  }
+  if (difference > 0) {
+    return const _BadgeAppearance(
+      label: 'Ahead of peers',
+      background: Color(0xFFD4EADF),
+      foreground: AppPalette.forest,
+      icon: Icons.north_east_rounded,
+    );
+  }
+  return const _BadgeAppearance(
+    label: 'Below peers',
+    background: Color(0xFFF4D6D0),
+    foreground: AppPalette.coral,
+    icon: Icons.south_east_rounded,
+  );
 }
 
 _BadgeAppearance _appearanceForState(String raw) {

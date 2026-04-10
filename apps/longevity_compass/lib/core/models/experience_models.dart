@@ -346,11 +346,14 @@ class PillarSnapshot {
     required this.whyItMatters,
     required this.hasEnoughData,
     required this.scoreConfidence,
+    this.keySignals = const <String, dynamic>{},
+    this.dataSources = const <String>[],
   });
 
   factory PillarSnapshot.fromJson(Map<String, dynamic> json) {
     final score = _asDouble(json['score']);
     final scoreLabel = _asString(json['score_label']);
+    final whyItMatters = _asString(json['why_it_matters']);
     return PillarSnapshot(
       id: _asString(json['id']),
       name: _asString(json['name']),
@@ -358,11 +361,15 @@ class PillarSnapshot {
       scoreLabel: scoreLabel.isNotEmpty ? scoreLabel : score.toStringAsFixed(0),
       state: _asString(json['state']),
       trend: _asString(json['trend']),
-      whyItMatters: _asString(json['why_it_matters']),
+      whyItMatters: whyItMatters.isNotEmpty
+          ? whyItMatters
+          : _asString(json['explanation']),
       hasEnoughData: json.containsKey('has_enough_data')
           ? _asBool(json['has_enough_data'])
           : true,
       scoreConfidence: _asString(json['score_confidence']),
+      keySignals: _asDynamicMap(json['key_signals']),
+      dataSources: _asStringList(json['data_sources']),
     );
   }
 
@@ -375,6 +382,8 @@ class PillarSnapshot {
   final String whyItMatters;
   final bool hasEnoughData;
   final String scoreConfidence;
+  final Map<String, dynamic> keySignals;
+  final List<String> dataSources;
 }
 
 class WeeklyPlan {
@@ -917,6 +926,18 @@ List<String> _asStringList(dynamic value) {
 }
 
 String _asString(dynamic value) => value?.toString() ?? '';
+
+Map<String, dynamic> _asDynamicMap(dynamic value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map(
+      (key, fieldValue) => MapEntry(key.toString(), fieldValue),
+    );
+  }
+  return const <String, dynamic>{};
+}
 
 int _asInt(dynamic value) {
   if (value is int) {

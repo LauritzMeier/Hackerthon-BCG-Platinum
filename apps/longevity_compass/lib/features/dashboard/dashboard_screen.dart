@@ -39,13 +39,6 @@ class DashboardScreen extends StatelessWidget {
         final watchTrends = experience.progressSummary.headlineTrends
             .take(3)
             .toList(growable: false);
-        final connectedSignals = experience.dataCoverage.connectedSources
-            .take(2)
-            .toList(growable: false);
-        final missingSignals = experience.dataCoverage.missingSources
-            .take(2)
-            .toList(growable: false);
-
         return RefreshIndicator(
           onRefresh: controller.refresh,
           child: ListView(
@@ -185,60 +178,6 @@ class DashboardScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                SectionSurface(
-                  title: 'What is shaping it right now',
-                  subtitle:
-                      'A short view of the care context and connected signals behind the compass.',
-                  child: Column(
-                    children: [
-                      _PlanEvidenceRow(
-                        label: 'Based on care',
-                        body: _firstSentence(
-                          experience.careContext.lastAppointmentSummary,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _PlanEvidenceRow(
-                        label: 'Based on connected data',
-                        body: connectedSignals.isEmpty
-                            ? 'No strong connected data source is shaping this plan yet.'
-                            : connectedSignals.join(' '),
-                      ),
-                      const SizedBox(height: 12),
-                      _PlanEvidenceRow(
-                        label: 'Still uncertain',
-                        body: missingSignals.isEmpty
-                            ? 'No major data gap is blocking this week\'s plan.'
-                            : missingSignals.first,
-                        accent: AppPalette.sand.withValues(alpha: 0.88),
-                      ),
-                      if (experience
-                          .careContext.medicalGuardrail.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppPalette.sand.withValues(alpha: 0.92),
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: Text(
-                            experience.careContext.medicalGuardrail,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: AppPalette.ink,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.4,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
                 if (watchTrends.isNotEmpty)
                   SectionSurface(
                     title: 'Signals worth watching',
@@ -296,50 +235,6 @@ class DashboardScreen extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _PlanEvidenceRow extends StatelessWidget {
-  const _PlanEvidenceRow({
-    required this.label,
-    required this.body,
-    this.accent,
-  });
-
-  final String label;
-  final String body;
-  final Color? accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: accent ?? Colors.white.withValues(alpha: 0.68),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: AppPalette.ink,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            body,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppPalette.ink.withValues(alpha: 0.78),
-                  height: 1.45,
-                ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -545,14 +440,4 @@ String _friendlyCheckInPrompt(String value) {
   }
 
   return trimmed;
-}
-
-String _firstSentence(String value) {
-  final trimmed = value.trim();
-  if (trimmed.isEmpty) {
-    return '';
-  }
-
-  final match = RegExp(r'^.*?[.!?](?:\s|$)').firstMatch(trimmed);
-  return match == null ? trimmed : match.group(0)!.trim();
 }
