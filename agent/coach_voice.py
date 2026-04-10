@@ -521,6 +521,55 @@ def safety_footers() -> List[str]:
     ]
 
 
+def compose_patient_update_sections(
+    update: Dict[str, Any],
+    analysis: Dict[str, Any],
+    *,
+    saved: bool = True,
+) -> List[str]:
+    pillars = analysis.get("pillars") or []
+    pillar_lookup = {pillar["id"]: pillar for pillar in pillars}
+    effect = analysis.get("patient_update_effect") or {}
+    affected_pillars = effect.get("affected_pillars") or list((update.get("pillar_impacts") or {}).keys())
+    primary = pillar_lookup.get(affected_pillars[0]) if affected_pillars else None
+    secondary = pillar_lookup.get(affected_pillars[1]) if len(affected_pillars) > 1 else None
+    total_delta = sum(
+        float((impact or {}).get("score_delta") or 0.0)
+        for impact in (update.get("pillar_impacts") or {}).values()
+    )
+    positive = total_delta >= 0
+
+    sections = []
+    if saved:
+        sections.append("I logged that update from chat and folded it into your current picture.")
+    else:
+        sections.append(
+            "I factored that update into this response, but I could not save it to your ongoing profile context."
+        )
+
+    if primary and secondary:
+        direction = "positive" if positive else "negative"
+        sections.append(
+            f"It gives {primary['name']} the strongest {direction} nudge right now, with a smaller effect on {secondary['name']}."
+        )
+    elif primary:
+        direction = "positive" if positive else "negative"
+        sections.append(f"It gives {primary['name']} a small {direction} nudge right now.")
+
+    if primary:
+        sections.append(
+            f"After factoring it in, {primary['name']} is sitting near {primary['score']} and is {trend_phrase(primary['trend'])}."
+        )
+
+    sections.append(
+        "Keep sharing updates like walks, meals, hydration, sleep, stress, or workouts when they happen. They help the compass stay more current between formal data refreshes."
+    )
+
+    safe = safety_footers()
+    sections.append(safe[0])
+    return sections
+
+
 def compose_pillar_sections(
     pillar: Dict[str, Any],
     firebase_summary: str,

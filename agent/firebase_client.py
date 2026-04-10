@@ -33,6 +33,7 @@ PATIENT_EXPERIENCE_COLLECTION = "patient_experiences"
 OFFER_CATALOG_COLLECTION = "offer_catalog"
 SUPPORT_BOOKINGS_COLLECTION = "support_bookings"
 COACH_CONVERSATIONS_COLLECTION = "coach_conversations"
+MAX_PATIENT_REPORTED_UPDATES = 25
 
 
 def _flag_enabled(*names: str) -> bool:
@@ -190,6 +191,45 @@ def _snapshot_data(snapshot: Any) -> Dict[str, Any]:
 
 def _conversation_ref(client: firestore.Client, patient_id: str):
     return client.collection(COACH_CONVERSATIONS_COLLECTION).document(patient_id)
+
+
+def get_patient_conversation_state(patient_id: str) -> Dict[str, Any]:
+    """Load lightweight conversation state used by the agent."""
+    try:
+        client = get_firestore_client()
+    except Exception as exc:  # pylint: disable=broad-except
+        return {
+            "ok": False,
+            "patient_id": patient_id,
+            "warning": _firebase_unavailable_reason(exc),
+            "agent_offer_state": {},
+            "patient_reported_updates": [],
+        }
+
+    try:
+        snapshot = _conversation_ref(client, patient_id).get()
+        data = _snapshot_data(snapshot)
+    except Exception as exc:  # pylint: disable=broad-except
+        return {
+            "ok": False,
+            "patient_id": patient_id,
+            "warning": f"{type(exc).__name__}: {exc}",
+            "agent_offer_state": {},
+            "patient_reported_updates": [],
+        }
+
+    updates = [
+        update
+        for update in (data.get("patient_reported_updates") or [])
+        if isinstance(update, dict)
+    ]
+    return {
+        "ok": True,
+        "patient_id": patient_id,
+        "exists": snapshot.exists,
+        "agent_offer_state": data.get("agent_offer_state") or {},
+        "patient_reported_updates": updates,
+    }
 
 
 def _normalize_overview_context(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -361,6 +401,7 @@ def get_patient_offer_context(patient_id: str) -> Dict[str, Any]:
     catalog_offers: List[Dict[str, Any]] = []
     bookings: List[Dict[str, Any]] = []
     agent_offer_state: Dict[str, Any] = {}
+    patient_reported_updates: List[Dict[str, Any]] = []
 
     try:
         experience_snapshot = client.collection(PATIENT_EXPERIENCE_COLLECTION).document(patient_id).get()
@@ -444,11 +485,17 @@ def get_patient_offer_context(patient_id: str) -> Dict[str, Any]:
         conversation_snapshot = _conversation_ref(client, patient_id).get()
         conversation_data = _snapshot_data(conversation_snapshot)
         agent_offer_state = conversation_data.get("agent_offer_state") or {}
+        patient_reported_updates = [
+            update
+            for update in (conversation_data.get("patient_reported_updates") or [])
+            if isinstance(update, dict)
+        ]
         if _is_firestore_debug_enabled():
             diagnostics["reads"].append({
                 "collection": COACH_CONVERSATIONS_COLLECTION,
                 "exists": conversation_snapshot.exists,
                 "has_agent_offer_state": bool(agent_offer_state),
+                "patient_reported_updates": len(patient_reported_updates),
             })
     except Exception as exc:  # pylint: disable=broad-except
         warning = warning or f"{type(exc).__name__}: {exc}"
@@ -493,6 +540,7 @@ def get_patient_offer_context(patient_id: str) -> Dict[str, Any]:
         "catalog_offers": catalog_offers,
         "support_bookings": bookings,
         "agent_offer_state": agent_offer_state,
+        "patient_reported_updates": patient_reported_updates,
         "primary_focus": ((experience_data.get("compass") or {}).get("primary_focus") or {}),
         "experience_available": bool(experience_data),
     }
@@ -539,6 +587,49 @@ def save_agent_offer_state(
         "offer_label": (offer or {}).get("offer_label"),
         "booking_id": (booking or {}).get("booking_id"),
         "scheduled_label": (booking or {}).get("scheduled_label"),
+    }
+
+
+def save_patient_reported_update(
+    patient_id: str,
+    *,
+    message: str,
+    derived_update: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Persist a patient-reported chat update under the conversation doc."""
+    client = get_firestore_client()
+    conversation_snapshot = _conversation_ref(client, patient_id).get()
+    conversation_data = _snapshot_data(conversation_snapshot)
+    updates = [
+        update
+        for update in (conversation_data.get("patient_reported_updates") or [])
+        if isinstance(update, dict)
+    ]
+
+    stored_update = {
+        "message": message.strip(),
+        "normalized_message": derived_update.get("normalized_message"),
+        "events": derived_update.get("events") or [],
+        "pillar_impacts": derived_update.get("pillar_impacts") or {},
+        "summary": derived_update.get("summary") or "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    updates.append(stored_update)
+    updates = updates[-MAX_PATIENT_REPORTED_UPDATES:]
+
+    payload: Dict[str, Any] = {
+        "patient_id": patient_id,
+        "source": "longevity_agent_service",
+        "last_updated_at": firestore.SERVER_TIMESTAMP,
+        "patient_reported_updates": updates,
+        "last_patient_reported_update": stored_update,
+    }
+    _conversation_ref(client, patient_id).set(payload, merge=True)
+    return {
+        "ok": True,
+        "patient_id": patient_id,
+        "saved_update": stored_update,
+        "patient_reported_updates": updates,
     }
 
 
