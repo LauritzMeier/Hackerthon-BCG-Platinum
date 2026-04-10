@@ -11,7 +11,8 @@ from statistics import mean
 from typing import Any, Dict, List, Optional
 
 from .coach_voice import derive_persona_context
-from .firebase_client import get_patient_firebase_context
+from .firebase_client import get_patient_conversation_state, get_patient_firebase_context
+from .patient_updates import apply_patient_reported_updates
 from longevity_mvp.bootstrap import ensure_local_warehouse
 from longevity_mvp.repository import WarehouseRepository
 
@@ -350,6 +351,7 @@ def _build_mental(profile: Dict[str, Any]) -> Dict[str, Any]:
 def analyze_patient_six_pillars(
     patient_id: str,
     firebase_context: Optional[Dict[str, Any]] = None,
+    conversation_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Analyze all six pillars from curated warehouse data and Firestore context."""
     profile = _repository().get_patient_profile(patient_id)
@@ -374,6 +376,14 @@ def analyze_patient_six_pillars(
         _build_nutrition(profile),
         _build_mental(profile),
     ]
+
+    conversation_context = conversation_context or get_patient_conversation_state(patient_id)
+    patient_update_effect = apply_patient_reported_updates(
+        pillars,
+        conversation_context.get("patient_reported_updates") or [],
+        score_to_state=_score_to_state,
+    )
+    pillars = patient_update_effect["pillars"]
     pillars.sort(key=lambda item: PILLARS.index(item["id"]))
     persona_context = derive_persona_context(profile)
     patient_profile = _patient_profile_summary(profile)
@@ -400,8 +410,10 @@ def analyze_patient_six_pillars(
         "pillars": pillars,
         "firebase_context_summary": firebase_summary,
         "firebase_context": firebase_context,
+        "conversation_context": conversation_context,
         "patient_profile": patient_profile,
         "persona_context": persona_context,
+        "patient_update_effect": patient_update_effect,
         "data_sources": [
             "curated.patient_profile",
             "curated.patient_metrics",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import asdict, dataclass
+from datetime import datetime
 import json
 import logging
 import os
@@ -21,16 +22,19 @@ from .coach_voice import (
     compose_dynamic_sections,
     compose_general_sections,
     compose_offer_booking_sections,
+    compose_patient_update_sections,
     compose_offer_recommendation_sections,
     firebase_context_line,
     safety_footers,
 )
 from .firebase_client import (
     create_support_booking,
+    get_patient_conversation_state,
     get_patient_firebase_context,
     get_patient_offer_context,
     get_runtime_diagnostics,
     save_agent_offer_state,
+    save_patient_reported_update,
 )
 from .offer_actions import (
     booking_confirmation_detected,
@@ -40,6 +44,7 @@ from .offer_actions import (
     offer_request_detected,
     select_matching_offer,
 )
+from .patient_updates import derive_patient_reported_update
 from .pillar_analysis import analyze_patient_six_pillars, generate_tailored_explanation
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -811,6 +816,79 @@ def _build_chat_sections(request: ChatRequest) -> Dict[str, object]:
                 "offer_action": offer_payload.get("offer_action"),
                 "booking": offer_payload.get("booking"),
             }
+
+    patient_update = derive_patient_reported_update(message)
+    if patient_update is not None:
+        saved = True
+        try:
+            save_result = save_patient_reported_update(
+                patient_id,
+                message=message,
+                derived_update=patient_update,
+            )
+            stored_update = save_result.get("saved_update") or {
+                **patient_update,
+                "created_at": datetime.utcnow().isoformat() + "Z",
+            }
+            conversation_context = {
+                "ok": True,
+                "patient_id": patient_id,
+                "agent_offer_state": {},
+                "patient_reported_updates": save_result.get("patient_reported_updates") or [stored_update],
+            }
+        except Exception:  # pylint: disable=broad-except
+            logger.exception(
+                "Failed to persist patient-reported update for patient_id=%s",
+                patient_id,
+            )
+            saved = False
+            stored_update = {
+                **patient_update,
+                "created_at": datetime.utcnow().isoformat() + "Z",
+            }
+            existing_conversation = get_patient_conversation_state(patient_id) or {}
+            conversation_context = {
+                "ok": False,
+                "patient_id": patient_id,
+                "warning": "Unable to persist patient-reported update.",
+                "agent_offer_state": existing_conversation.get("agent_offer_state", {}),
+                "patient_reported_updates": [
+                    *(
+                        update
+                        for update in (existing_conversation.get("patient_reported_updates") or [])
+                        if isinstance(update, dict)
+                    ),
+                    stored_update,
+                ],
+            }
+
+        analysis = analyze_six_pillars(
+            patient_id,
+            conversation_context=conversation_context,
+        )
+        sections = compose_patient_update_sections(
+            stored_update,
+            analysis,
+            saved=saved,
+        )
+        source_payload = {
+            **analysis,
+            "patient_reported_update": stored_update,
+            "patient_update_saved": saved,
+        }
+        debug_payload = _extract_debug_payload(source_payload, request) if _chat_debug_enabled(request) else None
+        if debug_payload:
+            debug_section = _build_debug_section(debug_payload)
+            if debug_section:
+                sections.append(debug_section)
+        return {
+            "patient_id": patient_id,
+            "sections": sections,
+            "evidence_index": analysis.get("pillars", []) if analysis.get("ok") else {},
+            "debug": debug_payload,
+            "offer_action": None,
+            "booking": None,
+        }
 
     request_profile = _parse_request_profile(message)
     analysis = analyze_six_pillars(patient_id)
